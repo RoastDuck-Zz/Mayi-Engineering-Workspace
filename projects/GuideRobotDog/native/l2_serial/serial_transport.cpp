@@ -42,6 +42,10 @@ SerialTransport::SerialTransport(const std::string& device,unsigned baudrate) {
            (actual.c_cflag&CSIZE)!=CS8 || (actual.c_cflag&(PARENB|CSTOPB|CRTSCTS|HUPCL)) ||
            (actual.c_iflag&(IXON|IXOFF|IXANY)) || (actual.c_lflag&(ICANON|ECHO|ISIG)))
             throw std::runtime_error("serial 4000000 raw 8N1 configuration unsupported");
+        // Discard host-side input queued while no monitor was running. Otherwise
+        // stale device stamps are paired with this run's receive time. TCIFLUSH
+        // discards input only; it emits no bytes or clock/configuration command.
+        if(tcflush(fd_,TCIFLUSH)!=0) throw failure("serial discard stale input");
     } catch(...) {close();throw;}
 #endif
 }

@@ -3,7 +3,7 @@
 当前阶段：**L2 Serial Core v1 — 为雷达避障与雷达跟随建立只读数据接收基础**。
 已实现 Linux 4 Mbps 串口、流组帧、CRC、点云/IMU 解码与主机时间戳分析。
 不链接官方 reader，不调用其自动校时路径。见 [核心使用说明](docs/L2_SERIAL_CORE.md)、
-[来源与许可证](docs/L2_DRIVER_PROVENANCE.md)及 [本轮报告](docs/PHASE_B1_REPORT.md)。
+[来源与许可证](docs/L2_DRIVER_PROVENANCE.md)及 [本轮 B2 报告](docs/PHASE_B2_REPORT.md)。
 Web 与 F710 已有；L2 正迁移到 **TTL UART → Unitree UART→USB Adapter → Pi USB**。
 实机证据和未完成项以本轮报告为准，尚未进入 ROS2 或实现跟随控制。
 见 [Serial 接入与验收](docs/L2_README.md)、[最终架构基线](docs/FINAL_ARCHITECTURE.md)

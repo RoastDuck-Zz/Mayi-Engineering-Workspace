@@ -1,15 +1,15 @@
-# Phase B1: target and evidence record only. No current script loads this YAML.
+# Phase B2: target and evidence record only. No current script loads this YAML.
 # No work-mode write, network change, device selection or udev install is implied.
 lidar:
   transport_target: "serial"
   device_target: "/dev/unitree_l2"
   work_mode_target: 8 # Standard FOV, 3D, IMU enabled, serial, auto start
-  transport_verified: false
-  device_verified: false
-  work_mode_verified: false
-  work_mode_current: null # UNKNOWN; USB enumeration is not mode readback
-  device_current: "/dev/ttyACM0" # Operator-confirmed adapter this session; no persistent alias
-  baudrate_verified: false
+  transport_verified: true # Actual cloud/IMU stream; integrity acceptance still false
+  device_verified: true # Operator identity plus unique private udev match
+  work_mode_verified: true # Serial GET readback after one SET8 and one L2 reset
+  work_mode_current: 8
+  device_current: "/dev/unitree_l2"
+  baudrate_verified: true # B4000000 readback and real received frames
   frame_id: "lidar_link"
   use_system_timestamp: false
   acceptance_passed: false
@@ -29,16 +29,23 @@ native_serial_core:
   device_command_api: false
   purpose: "lidar obstacle avoidance and target following data foundation"
 serial_acceptance:
-  enumeration: "PASS: operator confirmed candidate; persistent alias absent"
-  sdk_runtime: "NOT RUN"
-  native_runtime_10s: "NO_SENSOR_DATA: 1 byte, 0 valid frames, exit 3"
-  point_cloud: "NOT OBSERVED in 10s"
-  imu: "NOT OBSERVED in 10s"
-  timestamp_10s: "UNAVAILABLE: no decoded frames"
-  stability_at_least_60s: "NOT RUN"
-  clean_shutdown: "PASS: descriptor close after no-data 10s; streaming shutdown NOT RUN"
-  usb_reconnect: "NOT RUN"
+  evidence: "docs/PHASE_B2_REPORT.md"
+  enumeration: "PASS: operator identity and private unique-serial alias"
+  sdk_runtime: "EXCLUDED"
+  native_runtime_10s: "DATA_RECEIVED; CRC/framing acceptance FAIL"
+  point_cloud: "OBSERVED: finite points; stream integrity FAIL"
+  imu: "OBSERVED: finite raw values"
+  timestamp_10s: "RAW HALF-RATE: cloud 0.499491421, IMU 0.499466506"
+  stability_at_least_60s: "FAIL: sustained CRC/framing errors"
+  descriptor_close_no_data: "PASS"
+  streaming_clean_shutdown: "PASS: normal duration, SIGINT, SIGTERM, reopen with data"
+  usb_reconnect: "PASS: physical replug, alias restored, 10s cloud/IMU received; integrity still FAIL"
   ready_for_ros2: false
+timestamp_correction:
+  enabled: false
+  scale_num: 2
+  scale_den: 1
+  evidence: "B2 native 60s: cloud 0.499563380; IMU 0.499567746; docs/PHASE_B2_REPORT.md"
 historical_ethernet:
   evidence: "docs/L2_PHASE2_REPORT.md"
   verified_bench_date: "2026-09-09"
@@ -59,6 +66,13 @@ ros:
   pointcloud_topic: "/lidar/points"
   imu_topic: "/lidar/imu"
 mount:
+  evidence: "User-confirmed mechanical installation; docs/FINAL_ARCHITECTURE.md"
+  verified_axis_mapping: "+Z_lidar -> +X_base (tail -> head -> forward)"
+  mounting_fact_status: "VERIFIED MOUNTING FACT"
+  native_x_y_directions_verified: false
+  candidate_rotation_base_lidar: [[0, 0, 1], [0, 1, 0], [-1, 0, 0]]
+  candidate_rotation_verified: false
+  decoder_coordinates: "sensor-native"
   parent_frame: "base_link"
   calibrated: false
   publish_tf: false

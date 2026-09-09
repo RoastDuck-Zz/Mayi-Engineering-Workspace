@@ -41,7 +41,7 @@ bash scripts/deploy-pi.sh
 - wlan0：Wi-Fi 管理通道，承载 Web 与 SSH；不固定私人地址。
 - eth0：机器人专网，目标 Pi 10.21.20.2/24、机器人 10.21.20.1；无默认网关/DNS。
 - L2：TTL UART → Unitree UART→USB Adapter → Pi USB；目标 `/dev/unitree_l2`
-  尚需真实身份与持久命名验证。操作步骤见 [L2 README](L2_README.md)。
+  在 B2 已为当前适配器安装私有持久命名规则。操作步骤见 [L2 README](L2_README.md)。
 - F710：USB 接收器，经本机 HTTP 进入现有控制服务；见 [F710](F710.md)。
 
 网络配置脚本会改变系统状态，不能在部署时自动执行。先使用
@@ -52,3 +52,16 @@ bash scripts/deploy-pi.sh
 SOFT_ESTOP 与未来硬件 HARD_ESTOP 的区别、尚未实现的模式管理及自主能力见
 [最终架构基线](FINAL_ARCHITECTURE.md)。当前没有经过验收的动力断电链路；
 不要把零速度或进程退出当成 HARD_ESTOP。
+
+## L2 私有持久设备规则
+
+正式 `udev/99-unitree-l2.rules` 包含本机 USB 序列号，只保留在 Pi，
+已通过 udev/.gitignore 排除提交。换机不能直接套用这个规则：先运行
+`bash scripts/l2_serial_discover.sh`，以操作者确认的适配器读取同一 USB
+父设备的 VID、PID、serial，检查整机只有一个 tty 匹配这一组合。
+不得只用 VID/PID。生成本机规则后，先验证匹配唯一性，再执行
+`udevadm verify udev/99-unitree-l2.rules`；通过后方可安装到
+`/etc/udev/rules.d/99-unitree-l2.rules`、reload rules 并仅 trigger 目标 tty。
+检查 `/dev/unitree_l2` 解析结果，最后在停止 monitor 后由操作者实物重插验证。
+规则只增加 symlink；不更改用户组、设备模式或网络。当前运行仍需已有串口权限
+或显式 sudo。私有规则内容、完整 USB topology 不应上传公开仓库。

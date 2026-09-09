@@ -4,6 +4,16 @@ Receive foundation for lidar obstacle avoidance and lidar target following.
 Exports `CloudFrame` and `ImuFrame` for later perception consumers; no motion,
 follow controller, obstacle decision or ROS publisher is present in this phase.
 
+Mounting evidence: user confirms native +Z_lidar points along robot +X_base
+(tail → head → forward). This is VERIFIED MOUNTING FACT only. Robot +Y is left,
++Z is up. Full candidate mapping (without additional yaw/roll flips) is
+X_base=Z_lidar, Y_base=Y_lidar, Z_base=-X_lidar. Native +X/+Y orientations and
+translation remain unverified: do not publish this candidate as a calibrated TF.
+The decoder must retain native sensor coordinates. Future base_link → lidar_link
+TF owns the mounting transform. Before ROS2/static-TF acceptance, check real
+obstacles forward, left and above/ground against base +X, +Y and +Z/-Z and record
+the measured sensor-to-base mapping; never tune axes merely by RViz appearance.
+
 Linux C++17 and POSIX only. No Qt or Unitree runtime library. The attribution and
 wire layout are in [provenance](L2_DRIVER_PROVENANCE.md); the official reader's
 automatic-sync exclusion remains in [audit](L2_SERIAL_SDK_AUDIT.md).
@@ -48,8 +58,23 @@ network/firmware. No real robot commands are sent.
 python3 -m unittest discover -s tests -p test_l2_serial_core.py -v
 ```
 
+The transport clears only host input queued before a new run with TCIFLUSH,
+after configuring raw 8N1. This prevents pairing old device timestamps with new
+host receive times; no output bytes or time command are sent. A PTY regression
+test preloads an old valid IMU frame and verifies it is discarded.
+
 On Linux with g++, this compiles both monitor and C++ harness, generates synthetic
 fixtures, and tests PTY reception/no output bytes, 8N1/raw/4Mbps settings, timeout,
-signal and disconnect. On Windows, the safety source check runs; seven native
+signal and disconnect. On Windows, the safety source check runs; eight native
 tests skip and are covered on Ubuntu CI and Raspberry Pi. Tests never select a
-real tty. Hardware 10/60-second results are separately recorded in PHASE_B1_REPORT.
+real tty. Latest hardware results are separately recorded in PHASE_B2_REPORT.
+
+Mode activation is a separate, explicit maintenance operation:
+`python3 scripts/l2_transport_mode_once.py --host <existing-host-IP> --lidar
+<existing-L2-IP> --output <new-report.json>` queries mode only. Add
+`--activate-mode-8` only with authorization. Default does not reset; the optional
+`--reset-after-verified-set` requires this invocation to SET and read back8.
+An already8 device is never rewritten/reset by that activation flow. For Serial
+mode verification use `--device /dev/unitree_l2` instead of host/lidar. If a SET
+response is uncertain, inspect it through Serial; never blindly repeat activation.
+Existing historical mode0/version/sync scripts remain outside this workflow.

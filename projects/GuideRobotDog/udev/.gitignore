@@ -1,0 +1,2 @@
+# Machine-specific rule includes the private adapter serial. Generate on target.
+99-unitree-l2.rules

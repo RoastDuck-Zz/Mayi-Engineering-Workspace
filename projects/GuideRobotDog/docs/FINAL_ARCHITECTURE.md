@@ -18,6 +18,20 @@ ControlService 已有 3 秒控制权租约、300 ms 运动 TTL、软件锁定和
 
 ## Raspberry Pi 5B 硬件拓扑
 
+### 已确认的 L2 安装方向
+
+机器人 base_link 按 REP-103：+X 为狗尾 → 狗头 → 狗头前方，+Y 为左侧，
++Z 为上方。L2 整体约倾斜 90°；用户确认 **+Z_lidar → +X_base**，
+记为 VERIFIED MOUNTING FACT。L2 原生 +X、+Y 的实际朝向尚未验证。
+
+无额外 yaw/roll 翻转时的候选映射为 X_base=Z_lidar、Y_base=Y_lidar、
+Z_base=-X_lidar，候选 R_base_lidar=[[0,0,1],[0,1,0],[-1,0,0]]。
+该矩阵不是 CALIBRATED/VERIFIED，平移也尚未测量。
+packet decoder 保持 sensor-native 数据；安装旋转仅在未来 base_link →
+lidar_link 的 TF/extrinsic 中表达。后续 ROS2/TF 文档必须继承此约束。
+冻结 static TF 前，分别以机器人前方、左侧和上方/地面的实物目标验证
++X_base、+Y_base、+Z_base/-Z_base，记录明确轴映射；禁止凭 RViz 外观随意换轴。
+
 ```text
 Raspberry Pi 5B
 ├── eth0 ── Ethernet ── Black Panther X / Mymooo（10.21.20.1）

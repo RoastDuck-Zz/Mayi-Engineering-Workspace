@@ -2,7 +2,7 @@
 
 **当前目标：L2 TTL UART → Unitree UART→USB Adapter → Raspberry Pi 5B USB。**
 已实现独立 Serial Core v1：串口、组帧、CRC、点云/IMU 解码、时间分析和诊断。
-见 [使用说明](L2_SERIAL_CORE.md)与 [最新验收报告](PHASE_B1_REPORT.md)。
+见 [使用说明](L2_SERIAL_CORE.md)与 [最新 B2 验收报告](PHASE_B2_REPORT.md)。
 官方自动校时路径不作为 runtime；READY FOR ROS2 = **NO**。
 最终拓扑与控制安全边界见 [最终架构](FINAL_ARCHITECTURE.md)。
 
@@ -10,25 +10,26 @@
 
 Pi 的 eth0 留给机器狗（10.21.20.1），wlan0 承载 Web/SSH。
 L2 不占用 Ethernet，不再以第二张网卡作为最终部署方案。
-目标持久设备名 `/dev/unitree_l2` 尚未创建/验证；实际可能是 ttyACM 或 ttyUSB，
-必须人工识别，不永久依赖 `/dev/ttyACM0`。
+当前已为操作者确认的适配器安装私有唯一序列号规则，目标名 `/dev/unitree_l2`。
+不得把该映射假定为其它机器的事实；不永久依赖 `/dev/ttyACM0`。
 
 `config/l2.yaml` 只记录目标和证据，现有脚本不解析该 YAML，也不会据此自动配置硬件。
-`lidar.*_target` 是目标；三个 `*_verified: false` 表示传输、设备和模式均未验证。
-`work_mode_current: null` 表示 UNKNOWN。`historical_ethernet` 是过去实测，
+`lidar.*_target` 是目标；B2 已实际读回 Serial mode8 并收到原生数据。
+但持续 CRC/framing 错误使整体 acceptance 仍为 false。`historical_ethernet` 是过去实测，
 不能用于 Serial 自动回退或验收。配置中的禁止写入字段是政策记录，不是已实现的执行保护。
 
 目标 `work_mode=8`：Standard FOV、3D、IMU enabled、Serial、Power-on auto start。
 官方固定版本的 [工作模式位定义](https://github.com/unitreerobotics/unilidar_sdk2/blob/0e3c51f512e6b8ff60b8c32f160b412cb48445c2/README.md#32-configuring-work-mode)
 规定 bit 3 选择 Serial，其余相关位为 0；Ethernet 对应 0。
-此前设备读回 0；当前是否已切换为 8 是 UNKNOWN。不要直接运行厂商示例；
+此前设备读回 0；本轮获授权后一次 SET8、一次 reset，Serial 已读回8。不要直接运行厂商示例；
 固定源码与 x86_64 库已完成本轮审计，见 [SDK 审计](L2_SERIAL_SDK_AUDIT.md)。
 `runParse()` 内部会调用校时，`use_system_timestamp=false` 不会关闭它；公开 API
 没有禁用开关。独立 Core 已替代该接收路径，源码不链接官方 reader。
 
 普通启动、bringup、driver、diagnostics **不得设置工作模式**，也不得校时、重启或写永久配置。
 如果设备模式不符，停止接入验收；未来需经用户明确授权后使用独立一次性工具
-（例如 `l2_set_transport_once`）人工切换。本阶段不提供/执行此工具，不远程改真实模式。
+本轮一次性工具为 `scripts/l2_transport_mode_once.py`，严格独立于 monitor。
+默认只查询；任何后续切换仍需单独授权，不能纳入 service/driver 自动启动。
 
 ## 第一步：只读串口发现
 
@@ -62,7 +63,8 @@ Windows 测试只模拟元数据，不模拟点云或 IMU，不证明真实 USB 
 
 ## 持久命名
 
-VID、PID、Serial Number、USB topology 均 UNKNOWN。仅提供
+此前 Phase A 的示例保持不可安装；B2 当前适配器的真实属性已在 Pi 验证，
+含序列号的正式规则只保存在 Pi，不提交 Git。部署步骤见 PI_DEPLOYMENT.md。原
 [udev 示例](../udev/99-unitree-l2.rules.example)：
 **TEMPLATE ONLY / NOT READY TO INSTALL**，所有行都被注释，无可生效规则。
 未来用真实、同一 USB 父设备上的属性替换占位符，并验证匹配唯一性。
@@ -91,20 +93,20 @@ VID、PID、Serial Number、USB topology 均 UNKNOWN。仅提供
 
 | Serial 验收项 | 本阶段状态 |
 |---|---|
-| SERIAL ENUMERATION | PASS，操作者确认身份；持久别名缺失 |
+| SERIAL ENUMERATION | PASS，私有唯一匹配规则及物理重插验证 |
 | SERIAL SDK RUNTIME | EXCLUDED |
-| NATIVE SERIAL RUNTIME | 10 秒，1 byte，0 有效帧，退出码 3 |
-| POINT CLOUD | NOT OBSERVED |
-| IMU | NOT OBSERVED |
-| TIMESTAMP（10 秒窗口） | UNAVAILABLE |
-| STABILITY（≥60 秒） | NOT RUN |
-| SERIAL CLEAN SHUTDOWN | 无数据运行关闭成功；持续数据流下 NOT RUN |
-| USB RECONNECT | NOT RUN |
+| NATIVE SERIAL RUNTIME | 10/60 秒均收到真实数据，完整性验收 FAIL |
+| POINT CLOUD | OBSERVED，存活点有限；持续 CRC/framing 错误 |
+| IMU | OBSERVED，raw values 有限 |
+| TIMESTAMP | 两路 raw 增速约0.4996；未校时、未启用倍速修正 |
+| STABILITY（≥60 秒） | FAIL：持续 CRC/framing 错误 |
+| STREAMING CLEAN SHUTDOWN | PASS：正常结束、SIGINT、SIGTERM、重新打开 |
+| USB RECONNECT | PASS：人工重插后别名恢复、重新接收10秒 |
 | READY FOR ROS2 | NO |
 
-上表是完整 Serial 数据验收目标；最新实际结果见 [B1 报告](PHASE_B1_REPORT.md)。
-本轮 native monitor 已在 Pi ARM64 编译并运行 10 秒：1 byte、0 有效帧，
-退出码 3，描述符正常关闭；未进行 60 秒测试。官方 Serial 程序没有运行。
+最新实测见 [B2 报告](PHASE_B2_REPORT.md)；B1 的1byte历史记录保留不改。
+本轮获授权后0→8、一次L2 reset，实际数据已恢复但完整性仍未通过。
+官方 Serial 程序没有运行。
 discovery 仍仅查询元数据，既不加载 SDK 也不打开 tty。
 
 ## Previous verified Ethernet bench setup — historical evidence

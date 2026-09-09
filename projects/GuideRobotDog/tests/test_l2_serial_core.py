@@ -67,6 +67,24 @@ class NativeSerial(unittest.TestCase):
                 p = subprocess.run([str(self.exe), *args], capture_output=True)
                 self.assertEqual(p.returncode, 2)
 
+    def test_discards_preopen_backlog(self):
+        import pty
+        import tty
+        master,slave=pty.openpty()
+        prefix=self.path/'stale-backlog'
+        try:
+            tty.setraw(slave)
+            os.write(master,fixtures.imu(sec=1))
+            time.sleep(.02)
+            p=subprocess.run([str(self.exe),'--device',os.ttyname(slave),
+                              '--seconds','.2','--output',str(prefix)],capture_output=True,timeout=4)
+            summary=json.loads(pathlib.Path(str(prefix)+'-summary.json').read_text())
+            self.assertEqual(p.returncode,3)
+            self.assertEqual(summary['imu_frames'],0)
+            self.assertIsNone(summary['imu_timestamp']['first_raw'])
+        finally:
+            os.close(master);os.close(slave)
+
     def run_pty(self, payload=None, stop_signal=None, disconnect=False):
         import pty
         import select
