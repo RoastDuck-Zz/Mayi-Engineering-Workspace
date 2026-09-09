@@ -70,7 +70,7 @@ class PureRobotDogContractTests(unittest.TestCase):
             "web/index.html",
             "web/app.js",
             "README.md",
-            "RASPBERRY_PI5_DEPLOY.md",
+            "docs/PI_DEPLOYMENT.md",
             "robotdog-web.service",
             "requirements-hardware.txt",
         )

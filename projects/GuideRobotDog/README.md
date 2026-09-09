@@ -82,7 +82,7 @@ python server.py --mode mock --host 127.0.0.1 --port 8088 --pin 000000
 
 ## 树莓派部署
 
-完整流程见 [RASPBERRY_PI5_DEPLOY.md](RASPBERRY_PI5_DEPLOY.md)。上传后先保持 mock：
+完整流程见 [公开部署指南](docs/PI_DEPLOYMENT.md)。上传后先保持 mock：
 
 ```bash
 cd /home/guidedog/robotdog-control
@@ -132,4 +132,4 @@ node --test tests/test_*.cjs
 for script in scripts/*.sh; do bash -n "$script" || exit; done
 ```
 
-采购清单不被程序读取。旧迁移资料位于 `docs/history/`，只用于追溯，不代表当前系统组成。
+采购清单不被程序读取。本地历史迁移资料不属于运行或测试依赖；正式部署契约以上述公开指南为准。
