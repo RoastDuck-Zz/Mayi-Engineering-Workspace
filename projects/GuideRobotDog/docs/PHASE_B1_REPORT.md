@@ -37,8 +37,13 @@ neither obstacle decisions nor tracking/motion control are claimed complete.
   zero output bytes, raw 8N1/B4000000, no-data, signal and disconnect propagation.
 - Initial x86_64 tests passed before user requested direct Pi testing; subsequent
   Linux testing uses the Pi. No further WSL use.
-- Fresh tracked tree and final GitHub Actions status are recorded in the final
-  review package after the committed tree is verified and pushed.
+- Fresh tracked tree `5d83b16`: PASS. git archive exported only committed project
+  files, with no vendor SDK or private untracked guide. Windows: Python 84
+  discovered / 7 Linux skips, Node 9, Shell 16. Same archive uploaded to a new Pi
+  directory: full Python suite PASS, including native ARM64 build/PTY/C++ tests;
+  10 historical Windows-only tests skipped. Test output isolation fix included.
+- GitHub Actions execution status is reported separately after push; local
+  equivalents above do not imply a successful hosted workflow run.
 
 ## Actual hardware evidence
 
