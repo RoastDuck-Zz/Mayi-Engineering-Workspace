@@ -1,6 +1,7 @@
 #include "frame_assembler.h"
 #include "l2_packet_decoder.h"
 #include "timestamp_analyzer.h"
+#include "sequence_stats.h"
 #include <cmath>
 #include <fstream>
 #include <iostream>
@@ -74,5 +75,8 @@ int main(int argc,char** argv) {
     t.add(14,111); check(t.backsteps==1 && !t.ratio(),"backstep invalidates ratio");
     bool rejected=false; try {TimestampAnalyzer badscale(1,0);} catch(const std::exception&) {rejected=true;}
     check(rejected,"zero denominator rejected");
+    SequenceStats seq;
+    for(auto v:{1022u,1023u,0u,2u,2u,1u}) seq.add(v);
+    check(seq.wraps==1 && seq.duplicates==1 && seq.forward_gaps==1 && seq.missing==1 && seq.backward==1,"sequence continuity");
     std::cout<<checks<<" C++ assertions PASS\n";
 }

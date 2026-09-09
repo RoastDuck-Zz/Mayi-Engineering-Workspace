@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cmath>
 #include <csignal>
+#include <ctime>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -35,13 +36,14 @@ int main(int argc,char** argv) {
     std::string device="/dev/unitree_l2",output="reports/l2-serial";
     double seconds=60,num=1,den=1;unsigned baud=4000000;
     bool sample=false,frames=false;
+    size_t read_size=8192;
     try {
         for(int i=1;i<argc;++i) {
             std::string arg=argv[i];
             if(arg=="--help") {
                 std::cout<<"l2_serial_monitor [--device /dev/unitree_l2] [--seconds 60] [--baudrate 4000000]\n"
                            " [--output reports/l2-serial] [--frames-csv] [--sample-cloud-frame]\n"
-                           " [--time-scale-num 1] [--time-scale-den 1]\n";return 0;
+                           " [--time-scale-num 1] [--time-scale-den 1] [--read-size 8192]\n";return 0;
             }
             if(arg=="--sample-cloud-frame") {sample=true;continue;}
             if(arg=="--frames-csv") {frames=true;continue;}
@@ -50,6 +52,12 @@ int main(int argc,char** argv) {
             if(arg=="--device") device=value;
             else if(arg=="--output") output=value;
             else if(arg=="--seconds") seconds=positive(value);
+            else if(arg=="--read-size") {
+                double n=positive(value);
+                if(n!=1024 && n!=4096 && n!=8192 && n!=16384 && n!=32768)
+                    throw std::invalid_argument("read-size must be 1024/4096/8192/16384/32768");
+                read_size=static_cast<size_t>(n);
+            }
             else if(arg=="--time-scale-num") num=positive(value);
             else if(arg=="--time-scale-den") den=positive(value);
             else if(arg=="--baudrate") {
@@ -60,6 +68,8 @@ int main(int argc,char** argv) {
         TimestampAnalyzer validate(num,den);
     } catch(const std::exception& e) {std::cerr<<e.what()<<'\n';return 2;}
     DiagnosticReport report(num,den);FrameAssembler assembler;
+    report.requested_read_size=read_size;
+    std::clock_t cpu_start=std::clock();
     std::unique_ptr<SerialTransport> transport;
     std::ofstream frame_csv;
     double start=monotonic();int code=0;
@@ -78,9 +88,10 @@ int main(int argc,char** argv) {
         start=monotonic();
         while(!stopped) {
             double remaining=seconds-(monotonic()-start);if(remaining<=0) break;
-            uint8_t buffer[8192];
+            uint8_t buffer[32768];
             int timeout=std::max(1,std::min(100,int(std::ceil(remaining*1000))));
-            size_t n=transport->receive(buffer,sizeof(buffer),timeout);double host=monotonic();report.bytes+=n;
+            size_t n=transport->receive(buffer,read_size,timeout);double host=monotonic();report.bytes+=n;
+            report.read_observed(n);
             for(const auto& f:assembler.feed(buffer,n)) {
                 auto d=decode(f);report.observe(d,host);
                 if(frames) csv_packet(frame_csv,d,host,report);
@@ -94,6 +105,9 @@ int main(int argc,char** argv) {
                     out.close();sample=false;
                 }
             }
+            double processing=monotonic()-host;
+            report.processing_seconds+=processing;
+            report.max_processing_gap_ms=std::max(report.max_processing_gap_ms,processing*1000);
         }
         if(frames) frame_csv.close();
         if(stopped) {code=128+stopped;status="INTERRUPTED";}
@@ -103,6 +117,7 @@ int main(int argc,char** argv) {
     } catch(const std::exception& e) {code=1;status="ERROR";error=e.what();std::cerr<<error<<'\n';}
     if(transport) clean=transport->close();
     if(!clean) {code=1;status="ERROR";error+=" serial close failed";}
+    report.cpu_seconds=double(std::clock()-cpu_start)/CLOCKS_PER_SEC;
     try {
         auto parent=std::filesystem::path(output).parent_path();
         if(!parent.empty()) std::filesystem::create_directories(parent);

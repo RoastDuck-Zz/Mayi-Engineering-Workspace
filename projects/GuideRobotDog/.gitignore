@@ -1,3 +1,6 @@
 __pycache__/
 *.py[cod]
 .DS_Store
+# Raw integrity evidence and machine-specific captures stay private.
+*.bin
+captures/

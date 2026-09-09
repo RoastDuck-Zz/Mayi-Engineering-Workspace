@@ -67,6 +67,80 @@ class NativeSerial(unittest.TestCase):
                 p = subprocess.run([str(self.exe), *args], capture_output=True)
                 self.assertEqual(p.returncode, 2)
 
+    def test_read_size_cli(self):
+        for value in ('0','64','2048','999999','8192x'):
+            p=subprocess.run([str(self.exe),'--read-size',value],capture_output=True)
+            self.assertEqual(p.returncode,2)
+        for value in ('1024','4096','8192','16384','32768'):
+            prefix=self.path/('size-'+value)
+            p=subprocess.run([str(self.exe),'--read-size',value,'--device',str(self.path/'absent'),
+                              '--output',str(prefix)],capture_output=True)
+            self.assertEqual(p.returncode,1)
+
+    def test_replay_and_capture_limits(self):
+        subprocess.run(['bash',str(ROOT/'scripts/build_l2_serial_integrity.sh'),str(self.path)],check=True)
+        capture=self.path/'l2_serial_capture';replay=self.path/'l2_serial_replay'
+        for args in (['--seconds','11'],['--seconds','nan'],['--seconds','0'],['--max-bytes','16777217']):
+            p=subprocess.run([str(capture),*args,'--output',str(self.path/'never.bin')],capture_output=True)
+            self.assertEqual(p.returncode,2)
+        raw=self.path/'same.bin';raw.write_bytes(fixtures.imu()+fixtures.cloud()+fixtures.imu(seq=9))
+        out=self.path/'replay.json'
+        subprocess.run([str(replay),'--input',str(raw),'--output',str(out)],check=True)
+        cpp=json.loads(out.read_text())
+        py_path=self.path/'python.json'
+        subprocess.run([sys.executable,str(ROOT/'scripts/l2_raw_stream_check.py'),str(raw),'--output',str(py_path)],check=True)
+        py=json.loads(py_path.read_text())
+        for key in ('bytes_received','valid_frames','crc_errors','cloud_frames','imu_frames','imu_sequence','cloud_sequence'):
+            self.assertEqual(cpp[key],py[key],key)
+        self.assertIsNone(cpp['imu_timestamp']['host_ratio'])
+        import struct,zlib
+        malformed=[]
+        for frame,offset,value in ((fixtures.imu(),24,1000000000),(fixtures.cloud(),128,301)):
+            b=bytearray(frame);struct.pack_into('<I',b,offset,value)
+            struct.pack_into('<I',b,len(b)-12,zlib.crc32(b[12:-12]));malformed.append(b)
+        badraw=self.path/'malformed.bin'
+        badraw.write_bytes(b''.join(malformed)+b'xxxxxxxx'+bytes.fromhex('55aa050a'))
+        badcpp=self.path/'malformed-cpp.json';badpy=self.path/'malformed-py.json'
+        subprocess.run([str(replay),'--input',str(badraw),'--output',str(badcpp)],check=True)
+        subprocess.run([sys.executable,str(ROOT/'scripts/l2_raw_stream_check.py'),str(badraw),'--output',str(badpy)],check=True)
+        a=json.loads(badcpp.read_text());b=json.loads(badpy.read_text())
+        for key in ('valid_frames','decode_errors','cloud_frames','imu_frames','cloud_sequence','imu_sequence','trailing_bytes'):
+            self.assertEqual(a[key],b[key],key)
+        self.assertEqual(a['decode_errors'],2)
+        large=self.path/'large.bin'
+        with large.open('wb') as f:f.truncate(16*1024*1024+1)
+        result=subprocess.run([str(replay),'--input',str(large),'--output',str(self.path/'large.json')],capture_output=True)
+        self.assertNotEqual(result.returncode,0)
+        self.assertFalse((self.path/'large.json').exists())
+        original=raw.read_bytes()
+        alias=self.path/'alias.bin';alias.symlink_to(raw)
+        hard=self.path/'hard.bin';os.link(raw,hard)
+        for target in (alias,hard,out):
+            before=target.read_bytes()
+            for command in ([str(replay),'--input',str(raw),'--output',str(target)],
+                            [sys.executable,str(ROOT/'scripts/l2_raw_stream_check.py'),str(raw),'--output',str(target)]):
+                result=subprocess.run(command,capture_output=True)
+                self.assertNotEqual(result.returncode,0)
+                self.assertEqual(target.read_bytes(),before)
+                self.assertEqual(raw.read_bytes(),original)
+        # Hard byte cap checked with an actual PTY producer, never a real device.
+        import pty,tty
+        master,slave=pty.openpty();tty.setraw(slave)
+        dest=self.path/'bounded.bin'
+        p=subprocess.Popen([str(capture),'--device',os.ttyname(slave),'--seconds','.3',
+                            '--max-bytes','64','--output',str(dest)],stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+        try:
+            end=time.monotonic()+2
+            while not dest.exists() and time.monotonic()<end:time.sleep(.01)
+            time.sleep(.05);os.write(master,fixtures.imu())
+            stdout,stderr=p.communicate(timeout=3)
+            self.assertEqual(p.returncode,0,(stdout,stderr));self.assertEqual(dest.stat().st_size,64)
+            again=subprocess.run([str(capture),'--output',str(dest)],capture_output=True)
+            self.assertNotEqual(again.returncode,0);self.assertEqual(dest.stat().st_size,64)
+        finally:
+            if p.poll() is None:p.kill();p.wait()
+            os.close(master);os.close(slave)
+
     def test_discards_preopen_backlog(self):
         import pty
         import tty
