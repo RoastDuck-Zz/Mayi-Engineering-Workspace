@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0d0f0e" />
+    <title>Mymooo 控制台</title>
+    <meta name="description" content="Raspberry Pi 5B Mymooo 机器狗局域网控制台" />
+    <link rel="stylesheet" href="/styles.css?v=20260907-pure-dog" />
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="#dog-control" aria-label="返回控制台顶部">
+        <span class="brand-mark">M</span>
+        <span><b>Mymooo</b><small>ROBOT CONTROL</small></span>
+      </a>
+      <div class="connection-rack">
+        <div class="status-chip" id="robot-status"><i></i><span>机器狗未连接</span></div>
+        <div class="network-label"><small>ROBOT</small><strong id="robot-ip">10.21.20.1</strong></div>
+        <button class="button compact" id="connect-button">连接机器狗</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero-strip">
+        <div>
+          <p class="eyebrow">LOCAL / WIRED / LOW LATENCY</p>
+          <h1>Mymooo 控制台</h1>
+          <p>按住移动，松手即停。非零速度命令超过 <b id="motion-ttl-value">300</b> ms 未刷新立即停步；控制权租约 <b id="watchdog-value">3000</b> ms。</p>
+        </div>
+        <button class="estop" id="estop" aria-label="紧急停止"><span>EMERGENCY</span><b>急停</b><small>空格键</small></button>
+      </section>
+
+      <section class="dashboard-grid">
+        <article class="panel drive-panel" id="dog-control">
+          <div class="panel-heading">
+            <div><span>01</span><h2>方向控制</h2></div>
+            <button class="armed-state locked" id="armed-state" title="连接后点击解除急停"><i></i><span>急停锁定</span></button>
+          </div>
+          <div class="drive-layout">
+            <div class="dpad" aria-label="方向控制盘">
+              <button class="drive-key forward" data-axis="x" data-direction="1" aria-label="前进"><span>W</span><b>前进</b></button>
+              <button class="drive-key left" data-axis="y" data-direction="1" aria-label="左移"><span>A</span><b>左移</b></button>
+              <button class="drive-key stop" id="motion-stop" aria-label="停止"><span>●</span><b>停止</b></button>
+              <button class="drive-key right" data-axis="y" data-direction="-1" aria-label="右移"><span>D</span><b>右移</b></button>
+              <button class="drive-key backward" data-axis="x" data-direction="-1" aria-label="后退"><span>S</span><b>后退</b></button>
+            </div>
+            <div class="turn-control">
+              <p>转向 / YAW</p>
+              <div>
+                <button class="drive-key turn" data-axis="yaw" data-direction="1" aria-label="左转"><span>Q</span><b>左转</b></button>
+                <button class="drive-key turn" data-axis="yaw" data-direction="-1" aria-label="右转"><span>E</span><b>右转</b></button>
+              </div>
+              <div class="velocity-readout"><span>实时指令</span><output id="velocity-readout">X +0.00&nbsp;&nbsp;Y +0.00&nbsp;&nbsp;R +0.00</output></div>
+            </div>
+          </div>
+          <div class="speed-control">
+            <div><span>速度限制</span><strong id="speed-label">35%</strong></div>
+            <input id="speed" type="range" min="10" max="100" value="35" step="5" aria-label="速度限制" />
+            <div class="range-labels"><span>教学</span><span>巡航</span><span>敏捷</span></div>
+          </div>
+        </article>
+
+        <aside class="panel telemetry-panel">
+          <div class="panel-heading"><div><span>02</span><h2>实时状态</h2></div><small id="mode-label">SIM</small></div>
+          <div class="battery-block"><div><span>BATTERY</span><strong id="battery">--%</strong></div><div class="battery-track"><i id="battery-bar"></i></div></div>
+          <dl class="telemetry-list">
+            <div><dt>机体状态</dt><dd id="motion-state">--</dd></div>
+            <div><dt>控制权</dt><dd id="controller-state">--</dd></div>
+            <div><dt>安全原因</dt><dd id="safety-reason">--</dd></div>
+            <div><dt>当前步态</dt><dd id="gait">--</dd></div>
+            <div><dt>机身速度</dt><dd id="body-speed">-- m/s</dd></div>
+            <div><dt>姿态 R / P / Y</dt><dd id="imu">-- / -- / --</dd></div>
+            <div><dt>最高电机温度</dt><dd id="temperature">-- °C</dd></div>
+          </dl>
+          <div class="signal-card"><span class="pulse"></span><div><b>双重安全时限在线</b><small>命令超时停步 · 控制权超时急停</small></div></div>
+        </aside>
+
+        <article class="panel actions-panel">
+          <div class="panel-heading"><div><span>03</span><h2>姿态与步态</h2></div></div>
+          <div class="action-grid">
+            <button class="action-button" data-action="stand"><span>01</span><b>起立</b><small>STAND</small></button>
+            <button class="action-button" data-action="sit"><span>02</span><b>坐下</b><small>SIT</small></button>
+            <button class="action-button active" data-action="walk"><span>03</span><b>行走</b><small>WALK</small></button>
+            <button class="action-button caution" data-action="damping"><span>04</span><b>阻尼</b><small>DAMPING</small></button>
+          </div>
+          <div class="maintenance-row">
+            <label><input type="checkbox" id="zero-confirm" /><span>已确认四肢处于标准趴卧姿态</span></label>
+            <button class="text-button" id="zero-button">关节归零</button>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <dialog id="pin-dialog">
+      <form method="dialog" id="pin-form">
+        <p class="eyebrow">CONTROL ACCESS</p><h2>输入控制 PIN</h2>
+        <p>PIN 仅通过请求头发送，不写入地址栏。</p>
+        <input id="pin-input" type="password" inputmode="numeric" autocomplete="current-password" required autofocus />
+        <small id="pin-error" role="alert"></small><button class="button" type="submit">进入控制台</button>
+      </form>
+    </dialog>
+    <script src="/app.js?v=20260907-pure-dog"></script>
+  </body>
+</html>

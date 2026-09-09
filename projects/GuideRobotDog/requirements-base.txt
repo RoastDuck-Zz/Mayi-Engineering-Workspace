@@ -1,0 +1,2 @@
+# Mock/web mode uses only the Python standard library.
+# Keep this file so setup-pi.sh has a stable base dependency contract.

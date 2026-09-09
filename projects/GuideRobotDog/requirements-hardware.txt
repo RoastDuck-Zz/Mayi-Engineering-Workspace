@@ -1,0 +1,5 @@
+# Install only when the corresponding Raspberry Pi hardware is ready.
+# The official Mymooo robot SDK is installed by scripts/install-bpx-sdk.sh.
+# No extra PyPI hardware packages are required by this project.
+
+# The official SDK is intentionally installed separately with scripts/install-bpx-sdk.sh.

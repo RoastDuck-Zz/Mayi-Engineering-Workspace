@@ -81,6 +81,22 @@ token.json
 *.avi
 *.mkv
 
+# Archives, raw captures, generated evidence and vendored dependencies
+*.zip
+*.tar
+*.tar.gz
+*.pcap
+*.pcapng
+*.csv
+*.xyz
+reports/
+vendor/
+*.a
+*.so
+*.o
+core
+core.*
+
 # ==============================
 # OS
 # ==============================

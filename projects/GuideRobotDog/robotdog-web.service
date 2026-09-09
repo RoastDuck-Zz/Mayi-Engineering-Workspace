@@ -1,0 +1,19 @@
+[Unit]
+Description=Mymooo Robot Controller
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=guidedog
+WorkingDirectory=/home/guidedog/robotdog-control
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=-/etc/robotdog-web.env
+ExecStart=/bin/bash /home/guidedog/robotdog-control/scripts/run-server.sh --mode mock --host 0.0.0.0 --port 8088 --robot-ip 10.21.20.1
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

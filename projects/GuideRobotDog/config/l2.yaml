@@ -1,0 +1,33 @@
+# Actual temporary bench setup verified on 2026-09-09; SDK acceptance FAILED.
+# This file is a deployment record, not a network configuration applied by scripts.
+network:
+  interface: "" # Identify from MAC, link state and the actual wiring; do not guess by name
+  lidar_ip: "192.168.1.62"
+  host_ip: "192.168.1.2"
+  verified: false # Deployment template; re-verify on each robot
+  topology: "configure per deployment"
+  permanent: false
+  lidar_port: 6101
+  host_port: 6201
+lidar:
+  transport: "ethernet"
+  frame_id: "lidar_link"
+  use_system_timestamp: false
+  acceptance_passed: false # Timestamp remains a blocker
+  work_mode: 0 # Read back with valid CRC after one explicitly authorized change from 5
+  imu_enabled: true
+  timestamp_status: "device clock rate approximately 0.5; unresolved"
+  sdk_cleanup: "KNOWN_BUG; use l2_monitor_safe process isolation"
+ros:
+  pointcloud_topic: "/lidar/points"
+  imu_topic: "/lidar/imu"
+mount:
+  parent_frame: "base_link"
+  calibrated: false
+  publish_tf: false
+  x: null # TODO: measure, metres
+  y: null # TODO: measure, metres
+  z: null # TODO: measure, metres
+  roll: null # TODO: measure, radians
+  pitch: null # TODO: measure, radians
+  yaw: null # TODO: measure, radians

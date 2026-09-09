@@ -1,0 +1,17 @@
+{
+  "repository": "https://github.com/unitreerobotics/unilidar_sdk2",
+  "tag": "v2.0.10",
+  "commit": "0e3c51f512e6b8ff60b8c32f160b412cb48445c2",
+  "branch": null,
+  "source_type": "official_tag_archive",
+  "archive_url": "https://codeload.github.com/unitreerobotics/unilidar_sdk2/zip/refs/tags/v2.0.10",
+  "sha256": "8313a85e4bc1a47b73f98cccb9c887c41d897d6a71e800e9b5b03cd4f0fc8131",
+  "runtime_reported_version": "2.0.9",
+  "device_hardware": "2.2.1.1",
+  "device_firmware": "2.8.11.1",
+  "point_cloud_runtime": "PASS",
+  "imu": "PASS",
+  "timestamp": "FAIL",
+  "sdk_cleanup": "KNOWN BUG",
+  "ready_for_ros2": false
+}

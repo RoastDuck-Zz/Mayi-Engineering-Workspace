@@ -1,0 +1,8 @@
+#!/usr/bin/env python3
+"""Concise, read-only BPX status command."""
+
+from check_status import main
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,0 +1,23 @@
+[Unit]
+Description=Mymooo F710 standby controller
+Wants=robotdog-web.service
+After=robotdog-web.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=guidedog
+SupplementaryGroups=input
+WorkingDirectory=/home/guidedog/robotdog-control
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=/etc/robotdog-web.env
+ExecStart=/bin/bash /home/guidedog/robotdog-control/scripts/run-gamepad.sh
+Restart=always
+RestartSec=3
+TimeoutStopSec=15
+NoNewPrivileges=true
+PrivateTmp=true
+StandardInput=null
+
+[Install]
+WantedBy=multi-user.target
