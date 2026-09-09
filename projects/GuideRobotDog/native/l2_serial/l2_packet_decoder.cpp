@@ -21,6 +21,14 @@ DecodedPacket decode(const Bytes& b) {
     if(d.type!=102 && d.type!=104) {d.valid=true;return d;}
     const auto* p=b.data()+12;
     d.sequence=le32(p); d.raw_sec=le32(p+8); d.raw_nsec=le32(p+12);
+    if(d.type==102) {
+        d.sys_rotation_period=le32(p+16);
+        d.com_rotation_period=le32(p+20);
+        uint32_t up_bits=le32(p+28),down_bits=le32(p+32);
+        float up,down; std::memcpy(&up,&up_bits,4); std::memcpy(&down,&down_bits,4);
+        if(std::isfinite(up)) d.packet_lost_up=up;
+        if(std::isfinite(down)) d.packet_lost_down=down;
+    }
     // payload_size is retained on wire but is not used to index storage: its
     // semantics across firmware are not established. Outer fixed size is checked.
     if(*d.raw_nsec>=1000000000u) return d;

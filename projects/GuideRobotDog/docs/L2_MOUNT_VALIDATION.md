@@ -1,16 +1,19 @@
 # L2 mount validation
 
-The only verified mechanical fact is `+Z_lidar → +X_base`. `base_link` uses
+The current verified mechanical fact is `+Z_lidar → -Z_base`. The former
+`+Z_lidar → +X_base` statement is superseded by the later installation
+confirmation and remains historical only. `base_link` uses
 REP-103: +X is robot forward, +Y is left and +Z is up. The decoder and Ethernet
 driver preserve L2 sensor-native XYZ; no 90-degree rotation is applied in packet
 validation, replay or ROS conversion.
 
-The candidate rotation, pending confirmation of native X/Y, is:
+The complete rotation is unknown because native X/Y directions remain
+unverified. No candidate matrix is active in configuration:
 
 ```text
-X_base =  Z_lidar
-Y_base =  Y_lidar
-Z_base = -X_lidar
+X_base = UNKNOWN
+Y_base = UNKNOWN
+Z_base = -Z_lidar
 ```
 
 It is not calibrated or verified. Translation is also unknown and remains null.

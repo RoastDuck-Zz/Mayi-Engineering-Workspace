@@ -57,7 +57,10 @@ def analyze(path):
         for a,b in zip(rows,rows[1:]):
             d=(b[0]-a[0])%1024
             if d==1:raw_period.append(b[1]-a[1]);host_period.append(b[2]-a[2])
-            elif d: gaps.append({'previous_seq':a[0],'current_seq':b[0],'mod_delta':d,'raw_timestamp_delta':b[1]-a[1],'host_delta':b[2]-a[2],'missing_likely':d<=512 and b[1]>a[1]})
+            elif d:
+                nominal=statistics.median(raw_period) if len(raw_period)>=30 else None
+                ratio=(b[1]-a[1])/(d*nominal) if nominal and d>0 and b[1]>a[1] else None
+                gaps.append({'previous_seq':a[0],'current_seq':b[0],'mod_delta':d,'raw_timestamp_delta':b[1]-a[1],'host_delta':b[2]-a[2],'time_span_consistent':None if ratio is None else .8<=ratio<=1.2,'ratio':ratio})
         def summary(v):
             if not v:return {'count':0,'min':None,'median':None,'p50':None,'p95':None,'max':None}
             s=sorted(v);return {'count':len(v),'min':min(v),'median':statistics.median(s),'p50':statistics.median(s),'p95':s[min(len(s)-1,int(.95*(len(s)-1)))],'max':max(v)}

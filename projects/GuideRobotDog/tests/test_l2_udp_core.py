@@ -9,6 +9,7 @@ import zlib
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 spec=importlib.util.spec_from_file_location('fixtures',ROOT/'tests/fixtures/l2_serial/generate.py');fixtures=importlib.util.module_from_spec(spec);spec.loader.exec_module(fixtures)
 raw_spec=importlib.util.spec_from_file_location('raw',ROOT/'scripts/l2_udp_raw_check.py');raw=importlib.util.module_from_spec(raw_spec);raw_spec.loader.exec_module(raw)
+time_spec=importlib.util.spec_from_file_location('time_policy',ROOT/'scripts/l2_timestamp_policy.py');time_policy=importlib.util.module_from_spec(time_spec);time_spec.loader.exec_module(time_policy)
 
 def capture(frames):
     out=bytearray(b'GDL2UDP1')
@@ -33,6 +34,9 @@ class UdpCoreTests(unittest.TestCase):
         source=(ROOT/'native/l2_ethernet/l2_udp_monitor.cpp').read_text()
         self.assertIn('recvmsg(',source);self.assertIn('SO_RXQ_OVFL',source)
         self.assertNotIn('sendto(',source);self.assertNotIn('runParse(',source);self.assertNotIn('setLidarWorkMode(',source)
+        sdk=(ROOT/'native/l2_official_sdk_probe.cpp').read_text(encoding='utf-8')
+        self.assertIn('getLidarPointDataPacket',sdk);self.assertIn('getLidarImuDataPacket',sdk)
+        self.assertIn('initializeUDP(6101',sdk);self.assertIn('false,0,100',sdk)
         bad=bytearray(fixtures.imu());bad[30]^=1
         with tempfile.TemporaryDirectory() as d:
             p=pathlib.Path(d)/'bad.udpbin';p.write_bytes(capture([bytes(bad)]));self.assertEqual(raw.analyze(p)['crc_errors'],1)
@@ -47,5 +51,24 @@ class UdpCoreTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             p=pathlib.Path(d)/'points.csv';p.write_text('x,y,z\n0.1,2.0,0.2\n',encoding='utf-8')
             r=mount.probe(p);self.assertEqual(r['axis'],'+Y_lidar');self.assertFalse(r['tf_written'])
+
+    def test_anchored_timestamp_scale(self):
+        self.assertAlmostEqual(time_policy.anchored_scale(1_700_000_000.0, 1_700_000_001.0), 1_700_000_002.0)
+        self.assertNotEqual(time_policy.anchored_scale(1_700_000_000.0, 1_700_000_001.0), 3_400_000_002.0)
+        self.assertTrue(time_policy.gap_time_consistent(35, 35.0*.00232, .00232, 40))
+        self.assertFalse(time_policy.gap_time_consistent(35, .00232, .00232, 40))
+        self.assertIsNone(time_policy.gap_time_consistent(35, 35.0*.00232, .00232, 29))
+
+    def test_mount_current_fact_and_old_fact_is_not_current(self):
+        config=(ROOT/'config/l2.yaml').read_text(encoding='utf-8')
+        probe=(ROOT/'scripts/l2_mount_probe.py').read_text(encoding='utf-8')
+        self.assertIn('+Z_lidar -> -Z_base', config)
+        self.assertIn('+Z_lidar -> -Z_base', probe)
+        self.assertNotIn('lidar_z: base_x', config)
+
+    def test_protocol_packet_loss_offsets_are_exposed(self):
+        decoder=(ROOT/'native/l2_serial/l2_packet_decoder.cpp').read_text(encoding='utf-8')
+        self.assertIn('p+28',decoder);self.assertIn('p+32',decoder)
+        self.assertIn('packet_lost_up',decoder);self.assertIn('packet_lost_down',decoder)
 
 if __name__=='__main__':unittest.main()

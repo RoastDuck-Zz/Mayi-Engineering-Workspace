@@ -18,20 +18,21 @@ ControlService 已有 3 秒控制权租约、300 ms 运动 TTL、软件锁定和
 
 ## 当前 L2 Ethernet 主链路
 
-本轮 L2 的当前主链路是独立测试 Ethernet：
+本轮 L2 的目标接收链路优先使用固定版本的宇树官方 SDK；独立 passive
+receiver 仅作为 A/B 诊断链路：
 
 ```text
 Raspberry Pi 5B 192.168.1.2:6201
-        │ UDP passive receive
+        │ Official Unitree SDK receive path
         │ Ethernet
 Unitree L2 192.168.1.62:6101 (work_mode=0)
 ```
 
-接收器只绑定 `192.168.1.2:6201`，只接受来自 `192.168.1.62:6101` 的数据，
-不发送任何 UDP、模式、重启或校时命令。SO_RCVBUF、SO_RXQ_OVFL、UDP 和 NIC
-计数器均只读记录。当前 Ethernet 60 秒 CRC/tail/malformed 为零，但 Cloud
-序列存在与设备时间跨度相符的跳跃，分类为 `LINK_OR_SOURCE_LOSS_LIKELY`，
-因此 `L2_DRIVER_READY` 和 ROS2 readiness 仍未通过。
+官方 probe 直接读取 raw point/IMU packet；passive receiver 只绑定同一端口作独立
+对照，不发送 UDP、模式、重启或显式校时命令。C1.1 表明两条链路的 Cloud
+缺口同量级，分类为 `OFFICIAL_AND_PASSIVE_MATCH`；`closeUDP()` 的 ARM64
+析构崩溃单独记录为 SDK cleanup FAIL，因此 `L2_DRIVER_READY` 和 ROS2 readiness
+仍未通过。
 
 Serial→USB 仅作为历史失败调查保留：约 7–8.5% CRC corruption 与 cdc_acm
 overrun，见 [PHASE_B3_REPORT](PHASE_B3_REPORT.md)。本轮不再调整 UART。
@@ -41,12 +42,10 @@ overrun，见 [PHASE_B3_REPORT](PHASE_B3_REPORT.md)。本轮不再调整 UART。
 ### 已确认的 L2 安装方向
 
 机器人 base_link 按 REP-103：+X 为狗尾 → 狗头 → 狗头前方，+Y 为左侧，
-+Z 为上方。L2 整体约倾斜 90°；用户确认 **+Z_lidar → +X_base**，
++Z 为上方。L2 当前为倒装；用户确认 **+Z_lidar → -Z_base**。
 记为 VERIFIED MOUNTING FACT。L2 原生 +X、+Y 的实际朝向尚未验证。
 
-无额外 yaw/roll 翻转时的候选映射为 X_base=Z_lidar、Y_base=Y_lidar、
-Z_base=-X_lidar，候选 R_base_lidar=[[0,0,1],[0,1,0],[-1,0,0]]。
-该矩阵不是 CALIBRATED/VERIFIED，平移也尚未测量。
+原生 X/Y 方向与完整旋转仍未验证；当前不保留候选矩阵，平移也尚未测量。
 packet decoder 保持 sensor-native 数据；安装旋转仅在未来 base_link →
 lidar_link 的 TF/extrinsic 中表达。后续 ROS2/TF 文档必须继承此约束。
 冻结 static TF 前，分别以机器人前方、左侧和上方/地面的实物目标验证
@@ -159,7 +158,9 @@ Web/F710 发出的 HARD_ESTOP 是远程 power-cut request；实体蘑菇急停�
 ## L2 感知与未来自主链路
 
 ```text
-Unitree L2 → Ethernet UDP → passive validation → PointCloud + IMU
+Unitree L2 → Ethernet UDP → Official Unitree SDK → GuideRobotDog wrapper
+  (passive native diagnostics)
+  → PointCloud + IMU
   → timestamp validation → ROS2 Driver → Point-LIO → Nav2
   → Follow / Navigation / Patrol / Return Home → Control Arbiter → Safety
 Camera（后续）→ target perception → Follow
@@ -171,9 +172,9 @@ Camera（后续）→ target perception → Follow
 若未来需要切换，只能另建 `l2_set_transport_once` 一次性工具，经用户明确授权人工执行；
 Phase A 不创建或运行该工具。完整接入步骤与验收表见 [L2 README](L2_README.md)。
 
-原生 Serial 点云、IMU、10 秒时间戳窗口、至少 60 秒稳定性、退出和 USB 重连
-均验收通过后，才评审进入 ROS2。Ethernet 约 0.5 倍时钟及 closeUDP 缺陷是
-[历史证据](L2_PHASE2_REPORT.md)，不能直接套用到 Serial，也不能假定已消失。
+官方 raw packet、Cloud 连续性、时间策略、cleanup 和安装外参均验收通过后，才评审进入 ROS2。
+Ethernet raw clock 约 0.5 倍，采用独立的 anchored 2/1 policy；`closeUDP()` 缺陷
+仍需在 wrapper 边界隔离。安装外参未测量，禁止发布虚假的零 TF；点云/IMU 原点差异需按官方坐标定义处理。
 安装外参未测量，禁止发布虚假的零 TF；点云/IMU 原点差异需按官方坐标定义处理。
 
 ## 阶段路线图（后续均未实施）
@@ -199,5 +200,5 @@ Earlier Serial topology above is retained as design history; the current L2
 deployment choice is Ethernet. No host network settings were changed in B3.
 Robot Ethernet coexistence and final network topology still require explicit
 integration design; the bench transition does not establish ROS2 readiness.
-Sensor-native decoding and the verified mounting fact +Z_lidar → +X_base remain
+Sensor-native decoding and the verified mounting fact +Z_lidar → -Z_base remain
 unchanged; complete extrinsic calibration and static TF remain pending.

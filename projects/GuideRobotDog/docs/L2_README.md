@@ -10,6 +10,10 @@ Serial 完整性排查仍为 FAIL；USB 换口及拔除 Ethernet 均未改善。
 
 ## Current target Ethernet deployment
 
+Phase C1.1 adds a pinned Unitree SDK v2.0.10 raw-packet A/B probe. The official
+SDK is the preferred future receiver; the passive native receiver remains a
+diagnostic comparator. See [PHASE_C1_1_REPORT.md](PHASE_C1_1_REPORT.md).
+
 Current mode is Ethernet `work_mode=0`, L2 `192.168.1.62:6101`, Pi bind
 `192.168.1.2:6201`. The project receiver is passive and source-filters the
 expected L2 endpoint. It validates each UDP datagram and can handle multiple

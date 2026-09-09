@@ -15,6 +15,8 @@ struct DecodedPacket {
     uint32_t type=0,declared_length=0;
     std::optional<uint32_t> sequence,raw_sec,raw_nsec;
     std::optional<double> raw_timestamp;
+    std::optional<uint32_t> sys_rotation_period,com_rotation_period;
+    std::optional<float> packet_lost_up,packet_lost_down;
     std::optional<CloudFrame> cloud;
     std::optional<ImuFrame> imu;
 };

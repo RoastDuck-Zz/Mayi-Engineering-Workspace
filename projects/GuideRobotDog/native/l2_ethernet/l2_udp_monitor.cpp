@@ -53,7 +53,7 @@ int main(int argc,char** argv){
         if(got_ovfl){if(!first_ovfl)first_ovfl=ovfl;last_ovfl=ovfl;}
         if(peer.sin_addr.s_addr!=expected.sin_addr.s_addr||peer.sin_port!=expected.sin_port){++c.wrong_source;continue;}
         auto validated=validate_datagram(data,static_cast<size_t>(n),c);double host_time=now();
-        for(const auto& frame:validated.valid_frames){auto d=decode(frame);if(!d.valid)continue;if(d.cloud)cloud.add(*d.sequence,*d.raw_timestamp,host_time);if(d.imu)imu.add(*d.sequence,*d.raw_timestamp,host_time);}
+        for(const auto& frame:validated.valid_frames){auto d=decode(frame);if(!d.valid)continue;if(d.cloud)cloud.add(*d.sequence,*d.raw_timestamp,host_time,d.packet_lost_up,d.packet_lost_down);if(d.imu)imu.add(*d.sequence,*d.raw_timestamp,host_time);}
     }
     close(fd);std::ostringstream out;out<<"{\"status\":"<<(stopped?"\"INTERRUPTED\"":"\"OK\"")<<",\"runtime_seconds\":"<<now()-start;
     out<<",\"bind_ip\":";json_string(out,host);out<<",\"source_ip\":";json_string(out,lidar);out<<",\"host_port\":"<<host_port<<",\"lidar_port\":"<<lidar_port;

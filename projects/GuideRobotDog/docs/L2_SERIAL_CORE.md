@@ -4,10 +4,11 @@ Receive foundation for lidar obstacle avoidance and lidar target following.
 Exports `CloudFrame` and `ImuFrame` for later perception consumers; no motion,
 follow controller, obstacle decision or ROS publisher is present in this phase.
 
-Mounting evidence: user confirms native +Z_lidar points along robot +X_base
+Mounting evidence: the current user-confirmed inverted installation is native
++Z_lidar → -Z_base; the former +Z_lidar → +X_base statement is superseded.
 (tail → head → forward). This is VERIFIED MOUNTING FACT only. Robot +Y is left,
 +Z is up. Full candidate mapping (without additional yaw/roll flips) is
-X_base=Z_lidar, Y_base=Y_lidar, Z_base=-X_lidar. Native +X/+Y orientations and
+Native +X/+Y orientations and the complete rotation remain unknown. Native
 translation remain unverified: do not publish this candidate as a calibrated TF.
 The decoder must retain native sensor coordinates. Future base_link → lidar_link
 TF owns the mounting transform. Before ROS2/static-TF acceptance, check real

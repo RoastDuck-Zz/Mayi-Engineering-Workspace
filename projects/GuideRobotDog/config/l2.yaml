@@ -36,6 +36,28 @@ timestamp:
   candidate_scale_den: 1
   evidence_verified: true # Ethernet 60s Cloud/IMU ratios are both ~0.499
 
+official_sdk:
+  repository: "https://github.com/unitreerobotics/unilidar_sdk2"
+  tag: "v2.0.10"
+  commit: "0e3c51f512e6b8ff60b8c32f160b412cb48445c2"
+  runtime_verified: true
+  initialize_udp: PASS
+  run_parse: PASS
+  cleanup: FAIL_KNOWN_ARM64_CLOSEUDP
+  raw_packet_comparison: PASS
+
+runtime:
+  preferred_receiver: official_unitree_sdk
+  diagnostic_receiver: passive_native
+
+timestamp_policy:
+  reference_model: markgol_l2lidar_node
+  reference_commit: "e9931d5d9e9239829737b18c2485d23f155bc7cb"
+  scale_num: 2
+  scale_den: 1
+  correction_model: anchored_elapsed_scaling
+  host_sync_separate: true
+
 ros:
   integrated: false
   jazzy_available: false
@@ -44,11 +66,13 @@ ros:
   imu_topic: "/lidar/imu"
 
 mount:
-  evidence: "User-confirmed mechanical installation; docs/FINAL_ARCHITECTURE.md"
+  evidence: "User-confirmed inverted installation; docs/L2_MOUNT_VALIDATION.md"
   verified_axis_mapping:
-    lidar_z: base_x
-  native_x_y_directions_verified: false
-  full_rotation_verified: false
+    lidar_z: negative_base_z
+  mounting_fact: "+Z_lidar -> -Z_base"
+  native_x_direction_verified: false
+  native_y_direction_verified: false
+  rotation_verified: false
   decoder_coordinates: sensor-native
   parent_frame: base_link
   child_frame: lidar_link

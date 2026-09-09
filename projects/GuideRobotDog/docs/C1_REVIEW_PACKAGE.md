@@ -19,7 +19,7 @@ The receiver uses a native C++ UDP parser for the observed L2 wire frames. It va
 
 - `SO_RCVBUF` requested 4 MiB, actual 425,984 bytes; Pi `rmem_max` is 212,992. `SO_RXQ_OVFL` is supported but no ancillary drop counter was delivered during the runs.
 - ROS2 Jazzy is absent on the Pi, so no ROS2 package or live topic/TF acceptance was started.
-- Mounting evidence is partial: native `+Z_lidar -> +X_base` is verified. Native X/Y and the complete rotation remain unverified; no static TF was published.
+- Mounting amendment: the current verified fact is native `+Z_lidar -> -Z_base`. The former `+Z_lidar -> +X_base` statement is superseded; native X/Y and the complete rotation remain unverified and no static TF was published.
 
 ## Software verification
 
@@ -28,3 +28,6 @@ The receiver uses a native C++ UDP parser for the observed L2 wire frames. It va
 - GitHub Actions builds the passive Ethernet tools on Ubuntu and runs the existing Windows/Ubuntu software suites.
 
 The detailed evidence and command outputs are in [PHASE_C1_L2_ETHERNET_REPORT.md](PHASE_C1_L2_ETHERNET_REPORT.md).
+
+The follow-up official SDK comparison, packet-lost telemetry, timestamp policy,
+and mounting amendment are recorded in [PHASE_C1_1_REPORT.md](PHASE_C1_1_REPORT.md).
