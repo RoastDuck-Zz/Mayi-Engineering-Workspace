@@ -25,6 +25,7 @@ def _packet(kind,payload):
 
 QUERY=_packet(100,struct.pack('<II',6,0))
 SET8=_packet(2002,struct.pack('<I',8))
+SET0=_packet(2002,struct.pack('<I',0))
 RESET=_packet(100,struct.pack('<II',1,1))
 
 
@@ -34,31 +35,33 @@ def mode_from_frame(b):
     return struct.unpack_from('<I',b,12)[0]
 
 
-def execute(transport,activate=False,reset_after_set=False,result=None):
+def execute(transport,activate=False,reset_after_set=False,result=None,target_mode=8):
+    if target_mode not in (0,8): raise ValueError('only mode 0 or 8 supported')
+    command=SET0 if target_mode==0 else SET8
     if result is None: result={}
     result.update(before=None,after=None,set_sent=False,reset_sent=False,success=False)
     transport.send(QUERY)
     current=transport.receive_mode();result['before']=current
     print('CURRENT MODE:',current if current is not None else 'UNKNOWN',flush=True)
-    print('TARGET MODE: 8',flush=True)
+    print('TARGET MODE:',target_mode,flush=True)
     if current is None: return result
-    if not activate or current==8:
+    if not activate or current==target_mode:
         result.update(after=current,success=True);return result
-    # All non-8 values are visible readbacks. User authorized transition to 8;
-    # no arbitrary target mode argument or factory configuration is available.
-    print('COMMAND TO BE SENT: SET WORK MODE = 8; hex='+SET8.hex(),flush=True)
-    transport.send(SET8);result['set_sent']=True
+    # Activation is explicit and target is restricted to Ethernet0 / Serial8.
+    # No arbitrary mode or factory configuration is available.
+    print('COMMAND TO BE SENT: SET WORK MODE =',target_mode,'hex='+command.hex(),flush=True)
+    transport.send(command);result['set_sent']=True
     time.sleep(.2)
     transport.send(QUERY)
     after=transport.receive_mode();result['after']=after
-    if after!=8:
+    if after!=target_mode:
         print('STOP: set acceptance unverified; no retry or reset',flush=True)
         return result
     if reset_after_set:
         print('COMMAND TO BE SENT: L2 RESET; hex='+RESET.hex(),flush=True)
         transport.send(RESET);result['reset_sent']=True
     result['success']=True
-    print('Verify mode and streaming independently on Serial.',flush=True)
+    print('Verify mode and streaming independently on the target interface.',flush=True)
     return result
 
 
@@ -87,8 +90,8 @@ class Connection:
                 self.sock.close();raise
 
     def send(self,b):
-        if b not in (QUERY,SET8,RESET): raise ValueError('command not allowed')
-        if b in (SET8,RESET) and b in self.sent: raise RuntimeError('write may only be sent once')
+        if b not in (QUERY,SET8,SET0,RESET): raise ValueError('command not allowed')
+        if b in (SET8,SET0,RESET) and b in self.sent: raise RuntimeError('write may only be sent once')
         # Record attempt before syscall; partial/uncertain sends are never retried.
         self.sent.append(b)
         n=self.sock.sendto(b,self.peer) if self.sock else os.write(self.fd,b)
@@ -128,13 +131,15 @@ class Connection:
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--device');p.add_argument('--host');p.add_argument('--lidar')
-    p.add_argument('--activate-mode-8',action='store_true')
+    modes=p.add_mutually_exclusive_group()
+    modes.add_argument('--activate-mode-8',action='store_true')
+    modes.add_argument('--activate-mode-0',action='store_true')
     p.add_argument('--reset-after-verified-set',action='store_true',
-                   help='optional L2 reset only after this invocation sets and reads back 8')
+                   help='optional L2 reset only after this invocation sets and reads back the target mode')
     p.add_argument('--output',required=True)
     a=p.parse_args()
-    if a.reset_after_verified_set and not a.activate_mode_8:
-        p.error('--reset-after-verified-set requires --activate-mode-8')
+    if a.reset_after_verified_set and not (a.activate_mode_8 or a.activate_mode_0):
+        p.error('--reset-after-verified-set requires an explicit activation flag')
     if bool(a.device)==bool(a.host or a.lidar) or (not a.device and not(a.host and a.lidar)):
         p.error('choose --device OR explicit --host and --lidar')
     if not a.device:
@@ -146,7 +151,7 @@ def main():
         connection=None;result=dict(success=False)
         try:
             connection=Connection(a)
-            execute(connection,a.activate_mode_8,a.reset_after_verified_set,result)
+            execute(connection,a.activate_mode_8 or a.activate_mode_0,a.reset_after_verified_set,result,0 if a.activate_mode_0 else 8)
         except Exception as e:
             result['error']=str(e);print('STOP:',e,flush=True)
         finally:

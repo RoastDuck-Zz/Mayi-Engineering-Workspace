@@ -22,6 +22,19 @@ class ModeOnceTests(unittest.TestCase):
     def test_tool_exists(self):
         self.assertTrue((ROOT/'scripts/l2_transport_mode_once.py').is_file())
 
+    def test_ethernet_transition_and_uncertain_stop(self):
+        for replies,expected,success in [([8,0],['QUERY','SET0','QUERY','RESET'],True),
+                                         ([8,None],['QUERY','SET0','QUERY'],False),
+                                         ([0],['QUERY'],True)]:
+            sent=[]
+            class Fake:
+                def send(inner,b):sent.append(b)
+                def receive_mode(inner):return replies.pop(0)
+            result=self.m.execute(Fake(),True,True,target_mode=0)
+            self.assertEqual(sent,[getattr(self.m,k) for k in expected])
+            self.assertEqual(result['success'],success)
+        self.assertEqual(self.m.SET0,packet(2002,struct.pack('<I',0)))
+
     def test_protocol_allowlist(self):
         if not hasattr(self,'m'): self.skipTest('tool missing')
         self.assertEqual(self.m.QUERY,packet(100,struct.pack('<II',6,0)))

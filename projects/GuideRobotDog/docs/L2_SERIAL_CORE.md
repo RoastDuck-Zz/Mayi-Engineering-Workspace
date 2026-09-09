@@ -32,7 +32,8 @@ or reconnect acceptance. No udev/group/permissions changes are automatic.
 
 Options: `--baudrate 4000000` (only supported value), `--seconds` positive finite
 up to 86400, `--output` prefix, `--frames-csv`, `--sample-cloud-frame`,
-`--time-scale-num` and `--time-scale-den` (positive finite, default 1/1).
+`--time-scale-num` and `--time-scale-den` (positive finite, default 1/1),
+`--read-size` (1024, 4096, 8192 default, 16384 or 32768 only).
 Use a distinct output prefix for each run; outputs at that prefix are replaced.
 Raw sec/nsec are available in optional frame CSV; summary timestamps are seconds.
 Host elapsed and ratios use first-to-last receive times for each stream, not
@@ -66,8 +67,9 @@ test preloads an old valid IMU frame and verifies it is discarded.
 On Linux with g++, this compiles both monitor and C++ harness, generates synthetic
 fixtures, and tests PTY reception/no output bytes, 8N1/raw/4Mbps settings, timeout,
 signal and disconnect. On Windows, the safety source check runs; eight native
-tests skip and are covered on Ubuntu CI and Raspberry Pi. Tests never select a
-real tty. Latest hardware results are separately recorded in PHASE_B2_REPORT.
+tests plus two B3 native tests skip and are covered on Ubuntu CI and Raspberry Pi.
+Tests never select a real tty. Latest transport investigation is PHASE_B3_REPORT;
+PHASE_B2_REPORT remains historical evidence.
 
 Mode activation is a separate, explicit maintenance operation:
 `python3 scripts/l2_transport_mode_once.py --host <existing-host-IP> --lidar
@@ -78,3 +80,55 @@ An already8 device is never rewritten/reset by that activation flow. For Serial
 mode verification use `--device /dev/unitree_l2` instead of host/lidar. If a SET
 response is uncertain, inspect it through Serial; never blindly repeat activation.
 Existing historical mode0/version/sync scripts remain outside this workflow.
+After B3, the user authorized an Ethernet transition. The same maintenance tool
+now also accepts `--activate-mode-0`, mutually exclusive with `--activate-mode-8`.
+Default remains query-only. Reset requires this invocation to SET and read back
+the selected target; already-target and uncertain readback never reset. A delayed
+verification after an uncertain SET requires separate evidence and an explicitly
+authorized reset; never repeat the SET merely because an immediate query failed.
+
+## B3 integrity tools
+
+All live B3 tools receive through O_RDONLY at 4000000 raw 8N1; no L2 command,
+mode change, reset or timestamp sync is part of this workflow.
+
+```bash
+bash scripts/l2_usb_diagnostics.sh
+python3 scripts/l2_tty_stats.py --device /dev/unitree_l2
+bash scripts/build_l2_serial_integrity.sh
+./build/l2_serial_capture --device /dev/unitree_l2 --seconds 5 --output /tmp/new-l2-raw.bin
+./build/l2_serial_replay --input /tmp/new-l2-raw.bin --output /tmp/new-l2-cpp.json
+python3 scripts/l2_raw_stream_check.py /tmp/new-l2-raw.bin --output /tmp/new-l2-python.json
+python3 scripts/l2_integrity_run.py --executable ./build/l2_serial_monitor --prefix /tmp/new-l2-run --seconds 10 --read-size 8192
+```
+
+Use existing authorized device access; tools do not change permissions or install
+anything. USB identity/topology is redacted unless explicitly using `--private`.
+The runner requires a new private directory and records before/after TIOCGICOUNT,
+kernel logs and bounded /proc scheduling/load samples. Unsupported counters are
+null, not zero; negative/reset deltas are null. CDC driver rx/tx counters may not
+measure actual byte traffic, so monitor bytes remain authoritative.
+
+Capture defaults to 5 seconds, permits at most 10 seconds and 16 MiB, creates a
+0600 file exclusively, and stops at the byte cap. Raw bytes and host logs remain
+private. Both replay outputs require new files, including symlink/hardlink aliases.
+Replay accepts at most 16 MiB and never opens a tty. C++ uses the runtime assembler
+and decoder; Python independently uses struct/zlib. Host timing and ratios in C++
+replay are null because capture bytes do not contain host receive timestamps.
+
+Compare bytes, valid_frames, crc_errors, decode_errors, cloud_frames, imu_frames
+and both sequence objects. Valid frames mean length/tail/CRC accepted; cloud/IMU
+counts and sequences exclude invalid timestamp nanoseconds or cloud point count.
+Framing event counts are parser/chunk dependent, not a physical packet-loss count.
+Python bad-candidate examples are capped at 32; its gap histogram measures declared
+length minus distance to the next complete CRC-valid frame, not a proven byte loss.
+
+Sequence 1023→0 is an ordinary wrap. Other backwards changes stay unexpected;
+missing estimates count forward gaps only and do not invent missing wrap cycles.
+`confirmed_packet_loss` remains UNKNOWN. CRC-invalid data is always dropped.
+
+Monitor reports read-return histogram, zero reads/polls, maximum read, process CPU
+seconds, total parser processing wall time and `max_processing_gap_ms` (maximum
+read-return-to-processing-end wall time, including CSV work if enabled). It does
+not isolate kernel wait from scheduler delay. Combine with /proc samples; low
+processing time alone cannot exclude all host scheduling or USB-driver failures.

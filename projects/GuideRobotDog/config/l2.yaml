@@ -1,14 +1,14 @@
-# Phase B2: target and evidence record only. No current script loads this YAML.
+# Phase B3 and subsequent user-authorized Ethernet transition; evidence only.
 # No work-mode write, network change, device selection or udev install is implied.
 lidar:
-  transport_target: "serial"
+  transport_target: "ethernet" # User changed deployment choice after B3 tests
   device_target: "/dev/unitree_l2"
-  work_mode_target: 8 # Standard FOV, 3D, IMU enabled, serial, auto start
+  work_mode_target: 0 # Standard FOV, 3D, IMU enabled, Ethernet, auto start
   transport_verified: true # Actual cloud/IMU stream; integrity acceptance still false
   device_verified: true # Operator identity plus unique private udev match
-  work_mode_verified: true # Serial GET readback after one SET8 and one L2 reset
-  work_mode_current: 8
-  device_current: "/dev/unitree_l2"
+  work_mode_verified: true # Ethernet GET0 after authorized SET0 and one reset
+  work_mode_current: 0
+  device_current: null # Ethernet UDP; serial alias retained only as historical target
   baudrate_verified: true # B4000000 readback and real received frames
   frame_id: "lidar_link"
   use_system_timestamp: false
@@ -29,7 +29,7 @@ native_serial_core:
   device_command_api: false
   purpose: "lidar obstacle avoidance and target following data foundation"
 serial_acceptance:
-  evidence: "docs/PHASE_B2_REPORT.md"
+  evidence: "docs/PHASE_B3_REPORT.md"
   enumeration: "PASS: operator identity and private unique-serial alias"
   sdk_runtime: "EXCLUDED"
   native_runtime_10s: "DATA_RECEIVED; CRC/framing acceptance FAIL"
@@ -46,6 +46,19 @@ timestamp_correction:
   scale_num: 2
   scale_den: 1
   evidence: "B2 native 60s: cloud 0.499563380; IMU 0.499567746; docs/PHASE_B2_REPORT.md"
+ethernet_transition:
+  evidence: "docs/PHASE_B3_REPORT.md"
+  user_authorized: true
+  work_mode_readback: 0
+  set_count: 1
+  reset_count: 1
+  passive_60s_cloud_packets: 4483
+  passive_60s_imu_packets: 14974
+  passive_60s_crc_errors: 0
+  passive_60s_framing_errors: 0
+  cloud_sequence_continuity: "UNRESOLVED: 300 forward gaps and 8 unexpected backwards"
+  imu_sequence_continuity: "OBSERVED CONTINUOUS over 60s"
+  ready_for_ros2: false
 historical_ethernet:
   evidence: "docs/L2_PHASE2_REPORT.md"
   verified_bench_date: "2026-09-09"

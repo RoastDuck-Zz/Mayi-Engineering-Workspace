@@ -1,8 +1,10 @@
 # Unitree L2 Serial 接入与验收
 
-**当前目标：L2 TTL UART → Unitree UART→USB Adapter → Raspberry Pi 5B USB。**
+**当前目标：用户在 B3 排查后授权改为 L2 Ethernet → Raspberry Pi 网口，mode 0。**
+Serial 完整性排查仍为 FAIL；USB 换口及拔除 Ethernet 均未改善。参见
+[B3 与随后网口切换报告](PHASE_B3_REPORT.md)。历史 Serial 拓扑与工具继续保留。
 已实现独立 Serial Core v1：串口、组帧、CRC、点云/IMU 解码、时间分析和诊断。
-见 [使用说明](L2_SERIAL_CORE.md)与 [最新 B2 验收报告](PHASE_B2_REPORT.md)。
+见 [使用说明](L2_SERIAL_CORE.md)与 [历史 B2 验收报告](PHASE_B2_REPORT.md)。
 官方自动校时路径不作为 runtime；READY FOR ROS2 = **NO**。
 最终拓扑与控制安全边界见 [最终架构](FINAL_ARCHITECTURE.md)。
 

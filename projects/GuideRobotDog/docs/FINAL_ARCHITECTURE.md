@@ -170,3 +170,15 @@ Phase A 不创建或运行该工具。完整接入步骤与验收表见 [L2 READ
 | 硬件安全阶段 | 独立审查并验收动力断电链路及实体急停，再考虑远程硬急停 UI/按键 |
 
 任何真实运动、固件/永久配置、网络变更及动力断电测试均需单独明确授权。
+
+## B3 deployment amendment — 2026-09-09
+
+After UART integrity remained FAIL across read sizes, USB ports and Ethernet
+disconnection, the user selected Ethernet and authorized SET mode0 plus one L2
+reset. Ethernet GET0 was verified after restart. See docs/PHASE_B3_REPORT.md.
+Earlier Serial topology above is retained as design history; the current L2
+deployment choice is Ethernet. No host network settings were changed in B3.
+Robot Ethernet coexistence and final network topology still require explicit
+integration design; the bench transition does not establish ROS2 readiness.
+Sensor-native decoding and the verified mounting fact +Z_lidar → +X_base remain
+unchanged; complete extrinsic calibration and static TF remain pending.
