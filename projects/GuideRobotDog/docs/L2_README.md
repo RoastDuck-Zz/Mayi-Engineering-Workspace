@@ -8,7 +8,30 @@ Serial 完整性排查仍为 FAIL；USB 换口及拔除 Ethernet 均未改善。
 官方自动校时路径不作为 runtime；READY FOR ROS2 = **NO**。
 最终拓扑与控制安全边界见 [最终架构](FINAL_ARCHITECTURE.md)。
 
-## Current target Serial deployment
+## Current target Ethernet deployment
+
+Current mode is Ethernet `work_mode=0`, L2 `192.168.1.62:6101`, Pi bind
+`192.168.1.2:6201`. The project receiver is passive and source-filters the
+expected L2 endpoint. It validates each UDP datagram and can handle multiple
+complete protocol frames in one datagram; it never concatenates datagrams into
+the Serial FrameAssembler. Build with `bash scripts/build_l2_ethernet.sh`.
+
+The three 10-second Ethernet runs had CRC/tail/malformed/wrong-source zero and
+no UDP/NIC drops. The 60-second run also had CRC/tail/malformed zero, but Cloud
+sequence jumps repeatedly matched larger raw timestamp intervals. The evidence
+classification is `LINK_OR_SOURCE_LOSS_LIKELY`; this blocks ROS2 until reviewed.
+The Pi does not have `/opt/ros/jazzy/setup.bash`, and no online ROS installation
+is attempted.
+
+`l2_udp_monitor` records requested and actual SO_RCVBUF, SO_RXQ_OVFL ancillary
+counters, source filtering, packet validation, modulo-1024 sequence continuity,
+reorder-window metrics, Cloud/IMU timestamp gap observations and median/p95
+nominal periods. `l2_udp_capture` writes private 0600 GDL2UDP1 records bounded
+to 10 seconds/16 MiB. `l2_udp_replay` and the independent Python
+`l2_udp_raw_check.py` replay the same records for comparison. `l2_udp_host_stats.py`
+reads `/proc/net/snmp` and NIC counters only.
+
+## Historical Serial deployment
 
 Pi 的 eth0 留给机器狗（10.21.20.1），wlan0 承载 Web/SSH。
 L2 不占用 Ethernet，不再以第二张网卡作为最终部署方案。

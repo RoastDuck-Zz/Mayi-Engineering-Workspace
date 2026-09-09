@@ -2,6 +2,7 @@
 #include "l2_packet_decoder.h"
 #include "timestamp_analyzer.h"
 #include "sequence_stats.h"
+#include "sequence_window.h"
 #include <cmath>
 #include <fstream>
 #include <iostream>
@@ -78,5 +79,18 @@ int main(int argc,char** argv) {
     SequenceStats seq;
     for(auto v:{1022u,1023u,0u,2u,2u,1u}) seq.add(v);
     check(seq.wraps==1 && seq.duplicates==1 && seq.forward_gaps==1 && seq.missing==1 && seq.backward==1,"sequence continuity");
+    SequenceStats modulo;
+    for(auto v:{1022u,1023u,0u,1u}) modulo.add(v);
+    check(modulo.forward_gaps==0 && modulo.wraps==1,"modulo normal wrap");
+    SequenceStats gap;
+    for(auto v:{1022u,1u}) gap.add(v);
+    check(gap.forward_gaps==1 && gap.missing==2 && gap.backward==0,"modulo forward gap");
+    SequenceStats late;
+    for(auto v:{105u,103u}) late.add(v);
+    check(late.backward==1 && late.missing==0,"modulo backward candidate");
+    SequenceWindow window(64);
+    for(auto v:{100u,102u,101u,103u}) window.add(v);
+    check(window.immediate_gap_events()==1 && window.late_packet_count()==1 &&
+          window.reorder_events()==1 && window.unrecovered_missing()==0,"reorder window");
     std::cout<<checks<<" C++ assertions PASS\n";
 }

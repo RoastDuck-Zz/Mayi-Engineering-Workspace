@@ -1,97 +1,56 @@
-# Phase B3 and subsequent user-authorized Ethernet transition; evidence only.
-# No work-mode write, network change, device selection or udev install is implied.
+# Current L2 Ethernet target and evidence. Declarative only: no script loads it
+# to write device, network, mode, firmware, or timestamp settings.
 lidar:
-  transport_target: "ethernet" # User changed deployment choice after B3 tests
-  device_target: "/dev/unitree_l2"
-  work_mode_target: 0 # Standard FOV, 3D, IMU enabled, Ethernet, auto start
-  transport_verified: true # Actual cloud/IMU stream; integrity acceptance still false
-  device_verified: true # Operator identity plus unique private udev match
-  work_mode_verified: true # Ethernet GET0 after authorized SET0 and one reset
+  transport_target: ethernet
+  work_mode_target: 0
   work_mode_current: 0
-  device_current: null # Ethernet UDP; serial alias retained only as historical target
-  baudrate_verified: true # B4000000 readback and real received frames
-  frame_id: "lidar_link"
-  use_system_timestamp: false
-  acceptance_passed: false
-  allow_work_mode_write: false # Policy record, not an implemented runtime guard
-sdk_source_audit:
-  evidence: "docs/L2_SERIAL_SDK_AUDIT.md"
-  status: "BLOCKED: pinned x86_64 runParse implicitly synchronizes device time"
-  public_disable_auto_sync_api: false
-  safe_receive_implemented: false # Official reader excluded; native core below
-  arm64_runtime_behavior: "UNKNOWN"
-native_serial_core:
-  implemented: true
-  official_reader_linked: false
-  target_baudrate: 4000000
-  time_scale_num: 1
-  time_scale_den: 1
-  device_command_api: false
-  purpose: "lidar obstacle avoidance and target following data foundation"
-serial_acceptance:
-  evidence: "docs/PHASE_B3_REPORT.md"
-  enumeration: "PASS: operator identity and private unique-serial alias"
-  sdk_runtime: "EXCLUDED"
-  native_runtime_10s: "DATA_RECEIVED; CRC/framing acceptance FAIL"
-  point_cloud: "OBSERVED: finite points; stream integrity FAIL"
-  imu: "OBSERVED: finite raw values"
-  timestamp_10s: "RAW HALF-RATE: cloud 0.499491421, IMU 0.499466506"
-  stability_at_least_60s: "FAIL: sustained CRC/framing errors"
-  descriptor_close_no_data: "PASS"
-  streaming_clean_shutdown: "PASS: normal duration, SIGINT, SIGTERM, reopen with data"
-  usb_reconnect: "PASS: physical replug, alias restored, 10s cloud/IMU received; integrity still FAIL"
-  ready_for_ros2: false
-timestamp_correction:
-  enabled: false
-  scale_num: 2
-  scale_den: 1
-  evidence: "B2 native 60s: cloud 0.499563380; IMU 0.499567746; docs/PHASE_B2_REPORT.md"
-ethernet_transition:
-  evidence: "docs/PHASE_B3_REPORT.md"
-  user_authorized: true
-  work_mode_readback: 0
-  set_count: 1
-  reset_count: 1
-  passive_60s_cloud_packets: 4483
-  passive_60s_imu_packets: 14974
-  passive_60s_crc_errors: 0
-  passive_60s_framing_errors: 0
-  cloud_sequence_continuity: "UNRESOLVED: 300 forward gaps and 8 unexpected backwards"
-  imu_sequence_continuity: "OBSERVED CONTINUOUS over 60s"
-  ready_for_ros2: false
-historical_ethernet:
-  evidence: "docs/L2_PHASE2_REPORT.md"
-  verified_bench_date: "2026-09-09"
-  work_mode_readback: 0
-  imu_observed: true
-  point_cloud_runtime: "PASS (historical Ethernet only)"
-  timestamp_status: "FAIL; device clock rate approximately 0.5; sync did not fix ratio"
-  sdk_cleanup: "KNOWN_BUG closeUDP; historical process-isolation wrapper tested"
-  persistence_across_power_cycle: "UNKNOWN"
-  deployment_active: false
-  # Historical bench endpoints, never defaults for Serial deployment.
+  work_mode_verified: true
+  frame_id: lidar_link
+  acceptance_passed: false # Cloud source gaps remain classified; ROS2 is blocked
+
+ethernet:
   lidar_ip: "192.168.1.62"
   host_ip: "192.168.1.2"
   lidar_port: 6101
   host_port: 6201
+  transport_verified: true
+  integrity_verified: false # CRC clean; Cloud continuity has source-side gaps
+  requested_rcvbuf_bytes: 4194304
+  actual_rcvbuf_bytes: 425984 # Pi getsockopt; rmem_max was 212992
+  so_rxq_ovfl_supported: true
+  so_rxq_ovfl_delta: null # no ancillary counter was delivered in the run
+
+serial:
+  deployment_active: false
+  status: FAILED
+  historical_device: "/dev/unitree_l2"
+  historical_baudrate: 4000000
+  evidence: "docs/PHASE_B3_REPORT.md"
+  descriptor_close_no_data: PASS_HISTORICAL
+  streaming_clean_shutdown: PASS_HISTORICAL
+
+timestamp:
+  raw_clock_scale_observed: approximately_0.5
+  correction_enabled: false
+  candidate_scale_num: 2
+  candidate_scale_den: 1
+  evidence_verified: true # Ethernet 60s Cloud/IMU ratios are both ~0.499
+
 ros:
   integrated: false
+  jazzy_available: false
+  blocker: "ROS2 Jazzy is not installed on the Pi; Ethernet Cloud gaps also require classification"
   pointcloud_topic: "/lidar/points"
   imu_topic: "/lidar/imu"
+
 mount:
   evidence: "User-confirmed mechanical installation; docs/FINAL_ARCHITECTURE.md"
-  verified_axis_mapping: "+Z_lidar -> +X_base (tail -> head -> forward)"
-  mounting_fact_status: "VERIFIED MOUNTING FACT"
+  verified_axis_mapping:
+    lidar_z: base_x
   native_x_y_directions_verified: false
-  candidate_rotation_base_lidar: [[0, 0, 1], [0, 1, 0], [-1, 0, 0]]
-  candidate_rotation_verified: false
-  decoder_coordinates: "sensor-native"
-  parent_frame: "base_link"
-  calibrated: false
+  full_rotation_verified: false
+  decoder_coordinates: sensor-native
+  parent_frame: base_link
+  child_frame: lidar_link
+  translation_verified: false
   publish_tf: false
-  x: null # TODO: measure, metres
-  y: null # TODO: measure, metres
-  z: null # TODO: measure, metres
-  roll: null # TODO: measure, radians
-  pitch: null # TODO: measure, radians
-  yaw: null # TODO: measure, radians

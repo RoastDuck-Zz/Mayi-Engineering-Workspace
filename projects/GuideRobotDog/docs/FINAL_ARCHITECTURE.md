@@ -16,6 +16,26 @@ ControlService 已有 3 秒控制权租约、300 ms 运动 TTL、软件锁定和
 存在差距，下一阶段需迁移并验证，本阶段保留运行代码和现有测试。
 现有软件调用成功也不能证明机器人实际停止或进入阻尼。
 
+## 当前 L2 Ethernet 主链路
+
+本轮 L2 的当前主链路是独立测试 Ethernet：
+
+```text
+Raspberry Pi 5B 192.168.1.2:6201
+        │ UDP passive receive
+        │ Ethernet
+Unitree L2 192.168.1.62:6101 (work_mode=0)
+```
+
+接收器只绑定 `192.168.1.2:6201`，只接受来自 `192.168.1.62:6101` 的数据，
+不发送任何 UDP、模式、重启或校时命令。SO_RCVBUF、SO_RXQ_OVFL、UDP 和 NIC
+计数器均只读记录。当前 Ethernet 60 秒 CRC/tail/malformed 为零，但 Cloud
+序列存在与设备时间跨度相符的跳跃，分类为 `LINK_OR_SOURCE_LOSS_LIKELY`，
+因此 `L2_DRIVER_READY` 和 ROS2 readiness 仍未通过。
+
+Serial→USB 仅作为历史失败调查保留：约 7–8.5% CRC corruption 与 cdc_acm
+overrun，见 [PHASE_B3_REPORT](PHASE_B3_REPORT.md)。本轮不再调整 UART。
+
 ## Raspberry Pi 5B 硬件拓扑
 
 ### 已确认的 L2 安装方向
@@ -34,8 +54,8 @@ lidar_link 的 TF/extrinsic 中表达。后续 ROS2/TF 文档必须继承此约�
 
 ```text
 Raspberry Pi 5B
-├── eth0 ── Ethernet ── Black Panther X / Mymooo（10.21.20.1）
-├── USB ── Unitree UART→USB Adapter ── TTL UART ── Unitree L2
+├── eth0 ── isolated test Ethernet ── Unitree L2 (192.168.1.62)
+├── USB ── historical Unitree UART→USB Adapter ── TTL UART ── Unitree L2
 ├── USB ── Logitech F710 Receiver
 ├── USB3 ── Camera（后续）
 ├── GPIO / Safety Controller ── Relay / Contactor（后续）
@@ -139,15 +159,14 @@ Web/F710 发出的 HARD_ESTOP 是远程 power-cut request；实体蘑菇急停�
 ## L2 感知与未来自主链路
 
 ```text
-Unitree L2 → UART → USB Adapter → Linux serial device
-  → official SDK2 Serial API → PointCloud + IMU
+Unitree L2 → Ethernet UDP → passive validation → PointCloud + IMU
   → timestamp validation → ROS2 Driver → Point-LIO → Nav2
   → Follow / Navigation / Patrol / Return Home → Control Arbiter → Safety
 Camera（后续）→ target perception → Follow
 ```
 
-目标 `work_mode=8`（Standard FOV、3D、IMU enabled、Serial、上电自启），
-实际当前模式 UNKNOWN；历史 Ethernet 实测读回为 0。
+当前 `work_mode=0`（Standard FOV、3D、IMU enabled、Ethernet、上电自启），
+已由用户授权 SET0/RESET 后通过 Ethernet GET0 验证。历史 Serial mode8 仅作失败记录。
 普通 bringup、driver、diagnostics 和启动脚本不得写工作模式。
 若未来需要切换，只能另建 `l2_set_transport_once` 一次性工具，经用户明确授权人工执行；
 Phase A 不创建或运行该工具。完整接入步骤与验收表见 [L2 README](L2_README.md)。

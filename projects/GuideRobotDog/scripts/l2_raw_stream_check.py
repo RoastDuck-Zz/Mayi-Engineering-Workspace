@@ -14,7 +14,9 @@ SIZES={100:32,101:40,102:1044,103:5536,104:80,105:104,106:32,107:28,108:44,109:3
 def sequence(values):
     r=dict(first_seq=None,last_seq=None,frames=0,expected_next=None,duplicates=0,
            forward_gaps=0,estimated_missing_between_valid_frames=0,backward_unexpected=0,
-           wraps=0,out_of_range=0,sequence_gap_observed=False,confirmed_packet_loss='UNKNOWN')
+           wraps=0,out_of_range=0,immediate_gap_events=0,late_packet_count=0,
+           reorder_events=0,unrecovered_missing_after_window=0,
+           sequence_gap_observed=False,confirmed_packet_loss='UNKNOWN')
     for v in values:
         prev=r['last_seq']
         if r['first_seq'] is None:r['first_seq']=v
@@ -22,10 +24,14 @@ def sequence(values):
         if v>=1024:r['out_of_range']+=1
         if prev is None:continue
         if v==prev:r['duplicates']+=1
-        elif prev==1023 and v==0:r['wraps']+=1
-        elif v>prev and v<1024 and prev<1024:
-            if v!=prev+1:r['forward_gaps']+=1;r['estimated_missing_between_valid_frames']+=v-prev-1
-        elif v<prev:r['backward_unexpected']+=1
+        elif v<1024 and prev<1024:
+            delta=(v-prev)%1024
+            if delta==1:
+                if prev==1023 and v==0:r['wraps']+=1
+            elif delta<=512:
+                r['forward_gaps']+=1;r['immediate_gap_events']+=1;r['estimated_missing_between_valid_frames']+=delta-1
+            else:r['backward_unexpected']+=1;r['late_packet_count']+=1;r['reorder_events']+=1
+        elif v<prev:r['backward_unexpected']+=1;r['late_packet_count']+=1;r['reorder_events']+=1
     r['sequence_gap_observed']=bool(r['forward_gaps'] or r['backward_unexpected'])
     return r
 
