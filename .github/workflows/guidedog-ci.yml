@@ -1,0 +1,41 @@
+name: GuideRobotDog software verification
+on:
+  push:
+    paths:
+      - 'projects/GuideRobotDog/**'
+      - '.github/workflows/guidedog-ci.yml'
+  pull_request:
+    paths:
+      - 'projects/GuideRobotDog/**'
+      - '.github/workflows/guidedog-ci.yml'
+permissions:
+  contents: read
+jobs:
+  software:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: projects/GuideRobotDog
+        shell: bash
+    env:
+      PYTHONUTF8: '1'
+      PYTHONIOENCODING: utf-8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Python software tests (no hardware SDK)
+        run: python -m unittest discover -s tests -v
+      - name: Browser transport tests
+        run: node --test tests/test_*.cjs
+      - name: Shell syntax
+        run: for script in scripts/*.sh; do bash -n "$script" || exit 1; done

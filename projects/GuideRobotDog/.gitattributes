@@ -1,0 +1,2 @@
+# Shell files copied from Windows must retain Linux-compatible line endings.
+scripts/*.sh text eol=lf
