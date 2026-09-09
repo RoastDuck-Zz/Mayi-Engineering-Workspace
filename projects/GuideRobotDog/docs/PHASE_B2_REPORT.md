@@ -133,8 +133,12 @@ Reconnect lifecycle PASS; reconnection did not repair stream corruption.
 
 Windows Python96 discovered/8 Linux skips PASS; Node9 PASS; Shell16 PASS.
 Pi native suite9 PASS including187 C++ assertions and stale-backlog regression.
-Full tracked-tree Pi checks and exact pushed-HEAD CI status are verified before
-the final review package. Old B1/Ethernet reports and decoder geometry unchanged.
+Fresh tracked tree44ed7c9 exported with git archive: Windows Python96/8 Linux
+skips, Node9 and Shell16 PASS. Same archive uploaded into a new Pi directory:
+Python96/10 historical Windows skips PASS, including native compilation and187
+C++ assertions. No vendor SDK or untracked private inputs were needed. Exact
+pushed-HEAD CI status is checked for the final review package separately.
+Old B1/Ethernet reports and decoder geometry unchanged.
 Git placeholder identity corrected locally only; no old commit was rewritten.
 
 Actual transmitted commands: GET CONFIG for mode readbacks, SET WORK MODE8 once,
