@@ -36,6 +36,9 @@ jobs:
       - name: Require native compiler on Linux
         if: runner.os == 'Linux'
         run: g++ --version
+      - name: Build passive L2 Ethernet tools on Linux
+        if: runner.os == 'Linux'
+        run: bash scripts/build_l2_ethernet.sh build-ci
       - name: Python software tests (no hardware SDK)
         run: python -m unittest discover -s tests -v
       - name: Browser transport tests
