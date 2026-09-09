@@ -1,4 +1,4 @@
-# Phase A: target and evidence record only. No current script loads this YAML.
+# Phase B1: target and evidence record only. No current script loads this YAML.
 # No work-mode write, network change, device selection or udev install is implied.
 lidar:
   transport_target: "serial"
@@ -8,20 +8,35 @@ lidar:
   device_verified: false
   work_mode_verified: false
   work_mode_current: null # UNKNOWN; USB enumeration is not mode readback
-  device_current: null # UNKNOWN; do not assume ttyACM0
+  device_current: "/dev/ttyACM0" # Operator-confirmed adapter this session; no persistent alias
   baudrate_verified: false
   frame_id: "lidar_link"
   use_system_timestamp: false
   acceptance_passed: false
   allow_work_mode_write: false # Policy record, not an implemented runtime guard
+sdk_source_audit:
+  evidence: "docs/L2_SERIAL_SDK_AUDIT.md"
+  status: "BLOCKED: pinned x86_64 runParse implicitly synchronizes device time"
+  public_disable_auto_sync_api: false
+  safe_receive_implemented: false # Official reader excluded; native core below
+  arm64_runtime_behavior: "UNKNOWN"
+native_serial_core:
+  implemented: true
+  official_reader_linked: false
+  target_baudrate: 4000000
+  time_scale_num: 1
+  time_scale_den: 1
+  device_command_api: false
+  purpose: "lidar obstacle avoidance and target following data foundation"
 serial_acceptance:
-  enumeration: "NOT RUN"
+  enumeration: "PASS: operator confirmed candidate; persistent alias absent"
   sdk_runtime: "NOT RUN"
-  point_cloud: "NOT RUN"
-  imu: "NOT RUN"
-  timestamp_10s: "NOT RUN"
+  native_runtime_10s: "NO_SENSOR_DATA: 1 byte, 0 valid frames, exit 3"
+  point_cloud: "NOT OBSERVED in 10s"
+  imu: "NOT OBSERVED in 10s"
+  timestamp_10s: "UNAVAILABLE: no decoded frames"
   stability_at_least_60s: "NOT RUN"
-  clean_shutdown: "NOT RUN"
+  clean_shutdown: "PASS: descriptor close after no-data 10s; streaming shutdown NOT RUN"
   usb_reconnect: "NOT RUN"
   ready_for_ros2: false
 historical_ethernet:

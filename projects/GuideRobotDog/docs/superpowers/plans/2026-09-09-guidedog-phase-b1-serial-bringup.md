@@ -1,5 +1,9 @@
 # Phase A.1 + B1 implementation plan
 
+2026-09-09 scope update: Tasks 4/5 use the user-approved independent native
+Serial Core rather than the automatic-sync SDK reader. Execution plan:
+2026-09-09-l2-serial-core.md. Original reproducibility and CI commits are retained.
+
 Goal: Repository Reproducibility + L2 Serial Safe Bring-up.
 Approved scope is the user's Phase B1 request; base is
 `32fc870ed45f04f87669303f48351b0963c9ca24`, branch

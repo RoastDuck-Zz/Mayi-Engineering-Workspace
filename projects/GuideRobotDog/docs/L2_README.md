@@ -1,8 +1,9 @@
 # Unitree L2 Serial 接入与验收
 
 **当前目标：L2 TTL UART → Unitree UART→USB Adapter → Raspberry Pi 5B USB。**
-Phase A 只完成文档、目标配置和只读发现工具；Serial 实机测试全部 **NOT RUN**，
-READY FOR ROS2 = **NO**。USB 插入不等于雷达已经切到 Serial。
+已实现独立 Serial Core v1：串口、组帧、CRC、点云/IMU 解码、时间分析和诊断。
+见 [使用说明](L2_SERIAL_CORE.md)与 [最新验收报告](PHASE_B1_REPORT.md)。
+官方自动校时路径不作为 runtime；READY FOR ROS2 = **NO**。
 最终拓扑与控制安全边界见 [最终架构](FINAL_ARCHITECTURE.md)。
 
 ## Current target Serial deployment
@@ -21,7 +22,9 @@ L2 不占用 Ethernet，不再以第二张网卡作为最终部署方案。
 官方固定版本的 [工作模式位定义](https://github.com/unitreerobotics/unilidar_sdk2/blob/0e3c51f512e6b8ff60b8c32f160b412cb48445c2/README.md#32-configuring-work-mode)
 规定 bit 3 选择 Serial，其余相关位为 0；Ethernet 对应 0。
 此前设备读回 0；当前是否已切换为 8 是 UNKNOWN。不要直接运行厂商示例；
-先审查其配置、启停和校时操作。原生 Serial API 与库行为的完整审查尚待后续阶段。
+固定源码与 x86_64 库已完成本轮审计，见 [SDK 审计](L2_SERIAL_SDK_AUDIT.md)。
+`runParse()` 内部会调用校时，`use_system_timestamp=false` 不会关闭它；公开 API
+没有禁用开关。独立 Core 已替代该接收路径，源码不链接官方 reader。
 
 普通启动、bringup、driver、diagnostics **不得设置工作模式**，也不得校时、重启或写永久配置。
 如果设备模式不符，停止接入验收；未来需经用户明确授权后使用独立一次性工具
@@ -70,9 +73,8 @@ VID、PID、Serial Number、USB topology 均 UNKNOWN。仅提供
 
 1. USB enumeration：实际 Pi 输出与物理接线对应，记录操作系统、USB 拓扑与适配器身份。
 2. Serial identification：确认真实设备节点、权限及持久名称；节点存在不代表 mode=8。
-3. Official SDK serial runtime：检查 `config/sdk.lock.json` 固定版本的头文件、实现可见部分和
-   Serial 示例；确认真实函数签名、波特率、初始化/退出及隐藏副作用后，才编写最小受控监测程序。
-   不复用 UDP 初始化，不照搬带模式写入的示例。库内部不可见行为明确标 UNKNOWN。
+3. Native Serial runtime：官方 SDK 自动校时路径已排除；使用独立 Core，
+   检查波特率、帧完整性和错误统计。不开启模式写入、校时或启动旋转命令。
 4. Point cloud：验证持续非空帧、有限 XYZ/Intensity、范围、点数、帧率、接收间隔及序号变化。
    未知序号语义不能折算成真实丢包；缺失指标记 unavailable，不填假零。
 5. IMU：持续收到有限的加速度、角速度、姿态及原始时间戳；点云通过不代表 IMU 通过。
@@ -89,18 +91,21 @@ VID、PID、Serial Number、USB topology 均 UNKNOWN。仅提供
 
 | Serial 验收项 | 本阶段状态 |
 |---|---|
-| SERIAL ENUMERATION | NOT RUN |
-| SERIAL SDK RUNTIME | NOT RUN |
-| POINT CLOUD | NOT RUN |
-| IMU | NOT RUN |
-| TIMESTAMP（10 秒窗口） | NOT RUN |
+| SERIAL ENUMERATION | PASS，操作者确认身份；持久别名缺失 |
+| SERIAL SDK RUNTIME | EXCLUDED |
+| NATIVE SERIAL RUNTIME | 10 秒，1 byte，0 有效帧，退出码 3 |
+| POINT CLOUD | NOT OBSERVED |
+| IMU | NOT OBSERVED |
+| TIMESTAMP（10 秒窗口） | UNAVAILABLE |
 | STABILITY（≥60 秒） | NOT RUN |
-| SERIAL CLEAN SHUTDOWN | NOT RUN |
+| SERIAL CLEAN SHUTDOWN | 无数据运行关闭成功；持续数据流下 NOT RUN |
 | USB RECONNECT | NOT RUN |
 | READY FOR ROS2 | NO |
 
-本阶段没有新增 native Serial monitor，没有在 Windows 编译官方 aarch64 库，
-也没有运行官方 Serial 程序：**NOT RUN ON TARGET**。
+上表是完整 Serial 数据验收目标；最新实际结果见 [B1 报告](PHASE_B1_REPORT.md)。
+本轮 native monitor 已在 Pi ARM64 编译并运行 10 秒：1 byte、0 有效帧，
+退出码 3，描述符正常关闭；未进行 60 秒测试。官方 Serial 程序没有运行。
+discovery 仍仅查询元数据，既不加载 SDK 也不打开 tty。
 
 ## Previous verified Ethernet bench setup — historical evidence
 
@@ -124,7 +129,8 @@ Ethernet 半速问题在 Serial 上是否仍存在是 UNKNOWN，必须重新测�
 
 ## 后续数据与坐标边界
 
-未来 `SDK Serial → PointCloud + IMU → 时间验收 → ROS2 → Point-LIO → Nav2`。
+后续 `Native Serial Core → PointCloud + IMU → 时间验收 → 避障/目标跟踪 → 安全控制`。
+ROS2、Point-LIO、Nav2 尚未实现。
 主题目标 `/lidar/points`、`/lidar/imu` 尚未发布；ROS2 packages 尚未创建。
 `base_link → lidar_link` 外参未测量，配置保持 null、`publish_tf: false`。
 点云与 IMU 坐标轴平行但原点不同，未来驱动应遵循

@@ -1,7 +1,7 @@
 # GuideRobotDog 最终架构基线
 
 日期：2026-09-09。本文是用户已批准的目标设计，**不是完整实现或实机验收声明**。
-本次只做 Phase A：架构基线与 L2 Serial 迁移准备。
+Phase A 已完成；当前实现与实测进度见 PHASE_B1_REPORT.md。
 
 ## 当前实现与目标的边界
 
@@ -148,7 +148,7 @@ Phase A 不创建或运行该工具。完整接入步骤与验收表见 [L2 READ
 | 阶段 | 交付与进入条件 |
 |---|---|
 | Phase A | 本文、Serial 目标配置、接入指南、只读发现、不可安装 udev 示例；提交后停审 |
-| Proposed Phase B | 经审查后做 Pi 串口身份确认及受控 SDK Serial 运行验收；模式不符则停止，另行授权一次性切换 |
+| Phase B1 / Serial Core | 独立只读串口、组帧、解码和诊断；不使用自动校时的官方 reader。Pi 已编译，10 秒未收到有效帧；模式不符须停止并单独授权切换 |
 | 控制安全阶段 | 单独设计并实现 Mode Manager / Arbiter / SafetyState；先用 mock 验证急停、超时、切换、RESET/ARM；默认硬断电不可用 |
 | 感知定位阶段 | Serial 验收通过后 ROS2 Driver、标定与 Point-LIO；验证时间、坐标、QoS |
 | 自主阶段 | Nav2 与共用避障，随后 Navigation / Patrol / Return Home；感知与目标定义就绪后 Follow |
