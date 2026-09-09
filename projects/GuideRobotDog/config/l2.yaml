@@ -1,24 +1,46 @@
-# Actual temporary bench setup verified on 2026-09-09; SDK acceptance FAILED.
-# This file is a deployment record, not a network configuration applied by scripts.
-network:
-  interface: "" # Identify from MAC, link state and the actual wiring; do not guess by name
-  lidar_ip: "192.168.1.62"
-  host_ip: "192.168.1.2"
-  verified: false # Deployment template; re-verify on each robot
-  topology: "configure per deployment"
-  permanent: false
-  lidar_port: 6101
-  host_port: 6201
+# Phase A: target and evidence record only. No current script loads this YAML.
+# No work-mode write, network change, device selection or udev install is implied.
 lidar:
-  transport: "ethernet"
+  transport_target: "serial"
+  device_target: "/dev/unitree_l2"
+  work_mode_target: 8 # Standard FOV, 3D, IMU enabled, serial, auto start
+  transport_verified: false
+  device_verified: false
+  work_mode_verified: false
+  work_mode_current: null # UNKNOWN; USB enumeration is not mode readback
+  device_current: null # UNKNOWN; do not assume ttyACM0
+  baudrate_verified: false
   frame_id: "lidar_link"
   use_system_timestamp: false
-  acceptance_passed: false # Timestamp remains a blocker
-  work_mode: 0 # Read back with valid CRC after one explicitly authorized change from 5
-  imu_enabled: true
-  timestamp_status: "device clock rate approximately 0.5; unresolved"
-  sdk_cleanup: "KNOWN_BUG; use l2_monitor_safe process isolation"
+  acceptance_passed: false
+  allow_work_mode_write: false # Policy record, not an implemented runtime guard
+serial_acceptance:
+  enumeration: "NOT RUN"
+  sdk_runtime: "NOT RUN"
+  point_cloud: "NOT RUN"
+  imu: "NOT RUN"
+  timestamp_10s: "NOT RUN"
+  stability_at_least_60s: "NOT RUN"
+  clean_shutdown: "NOT RUN"
+  usb_reconnect: "NOT RUN"
+  ready_for_ros2: false
+historical_ethernet:
+  evidence: "docs/L2_PHASE2_REPORT.md"
+  verified_bench_date: "2026-09-09"
+  work_mode_readback: 0
+  imu_observed: true
+  point_cloud_runtime: "PASS (historical Ethernet only)"
+  timestamp_status: "FAIL; device clock rate approximately 0.5; sync did not fix ratio"
+  sdk_cleanup: "KNOWN_BUG closeUDP; historical process-isolation wrapper tested"
+  persistence_across_power_cycle: "UNKNOWN"
+  deployment_active: false
+  # Historical bench endpoints, never defaults for Serial deployment.
+  lidar_ip: "192.168.1.62"
+  host_ip: "192.168.1.2"
+  lidar_port: 6101
+  host_port: 6201
 ros:
+  integrated: false
   pointcloud_topic: "/lidar/points"
   imu_topic: "/lidar/imu"
 mount:

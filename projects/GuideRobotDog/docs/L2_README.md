@@ -1,102 +1,133 @@
-# Unitree L2 基础接入与诊断
+# Unitree L2 Serial 接入与验收
 
-当前状态：**IMU已恢复，点云运行和安全退出wrapper通过；设备时间仍约半速，暂不进入ROS2**。SDK原生关闭仍有已知缺陷。两个扩展坞链路仍未验证。最新结论见`L2_PHASE2_REPORT.md`。
+**当前目标：L2 TTL UART → Unitree UART→USB Adapter → Raspberry Pi 5B USB。**
+Phase A 只完成文档、目标配置和只读发现工具；Serial 实机测试全部 **NOT RUN**，
+READY FOR ROS2 = **NO**。USB 插入不等于雷达已经切到 Serial。
+最终拓扑与控制安全边界见 [最终架构](FINAL_ARCHITECTURE.md)。
 
-实际运行主机：Raspberry Pi 5 Model B Rev 1.1，Ubuntu 24.04.4 LTS，aarch64。
-Pi 上使用独立的 `$HOME/l2_integration` 诊断目录，不操作机器狗控制部署目录。
+## Current target Serial deployment
 
-## 重复运行诊断
+Pi 的 eth0 留给机器狗（10.21.20.1），wlan0 承载 Web/SSH。
+L2 不占用 Ethernet，不再以第二张网卡作为最终部署方案。
+目标持久设备名 `/dev/unitree_l2` 尚未创建/验证；实际可能是 ttyACM 或 ttyUSB，
+必须人工识别，不永久依赖 `/dev/ttyACM0`。
 
-```bash
-ssh <pi-user>@<management-address>
-cd ~/l2_integration
-sudo -v
-bash scripts/l2_diagnostics.sh > reports/diagnostics-$(date +%Y%m%d-%H%M%S).txt 2>&1
-```
+`config/l2.yaml` 只记录目标和证据，现有脚本不解析该 YAML，也不会据此自动配置硬件。
+`lidar.*_target` 是目标；三个 `*_verified: false` 表示传输、设备和模式均未验证。
+`work_mode_current: null` 表示 UNKNOWN。`historical_ethernet` 是过去实测，
+不能用于 Serial 自动回退或验收。配置中的禁止写入字段是政策记录，不是已实现的执行保护。
 
-接口/IP 未确认时退出码 3 是刻意阻止测试，不能解释为通过。诊断脚本不安装软件、不更改网络、不自动选网卡。
-`config/l2.yaml` 是统一配置记录；当前诊断脚本通过命令参数或环境变量取值，不自动解析 YAML。
-当前配置记录的是经MAC/插拔和ARP确认的板载`eth0`、L2 `192.168.1.62`、临时主机`192.168.1.2/24`。`network.verified: true`只代表IP/link，`lidar.acceptance_passed: false`仍明确禁止当成完整通过。
+目标 `work_mode=8`：Standard FOV、3D、IMU enabled、Serial、Power-on auto start。
+官方固定版本的 [工作模式位定义](https://github.com/unitreerobotics/unilidar_sdk2/blob/0e3c51f512e6b8ff60b8c32f160b412cb48445c2/README.md#32-configuring-work-mode)
+规定 bit 3 选择 Serial，其余相关位为 0；Ethernet 对应 0。
+此前设备读回 0；当前是否已切换为 8 是 UNKNOWN。不要直接运行厂商示例；
+先审查其配置、启停和校时操作。原生 Serial API 与库行为的完整审查尚待后续阶段。
 
-确认 L2 网卡 MAC、sysfs USB 路径、插拔对应关系、真实 L2 IP 后：
+普通启动、bringup、driver、diagnostics **不得设置工作模式**，也不得校时、重启或写永久配置。
+如果设备模式不符，停止接入验收；未来需经用户明确授权后使用独立一次性工具
+（例如 `l2_set_transport_once`）人工切换。本阶段不提供/执行此工具，不远程改真实模式。
 
-```bash
-read -r -p '已确认的 L2 接口: ' L2_INTERFACE
-read -r -p '已确认的 L2 IPv4: ' L2_IP
-export L2_INTERFACE L2_IP
-sudo -v
-L2_CAPTURE_SECONDS=10 bash scripts/l2_network_test.sh
-```
+## 第一步：只读串口发现
 
-快速脚本检查 carrier、直连路由、绑定接口的 ping、邻居表及入站 UDP。抓包禁用混杂模式，不存储负载；临时文本在结束时删除。
-退出码：2 参数错误；3 链路/直连路由前提未满足；4 工具/权限/抓包错误；5 未观察到 UDP。
-退出 0 仅表示观察到 UDP，不证明点云、IMU或稳定性通过。输出抓包计数、平均包速率、观察到的最大相邻包间隔和每秒计数；tcpdump 内核丢包输出也保留。
-
-## 分层验证顺序
-
-1. 物理接线与供电：先确认一个 USB 网卡能枚举，再逐个加入扩展坞复测；`lsusb -t` 中同一扩展坞可能同时出现 USB2/USB3 Hub，不按条目数推断物理数量。
-2. 用 `ip link`、`readlink -f /sys/class/net/接口/device`、`ethtool -i 接口`、MAC 与插拔记录确认接口；`ethtool 接口` 确认协商速率和双工。
-3. 先被动观察专用接口的 ARP/UDP，例如 `sudo timeout -s INT 15 tcpdump -p -ni "$L2_INTERFACE" -e 'arp or udp'`。没有目标接口时禁止在 Wi-Fi 上扫描候选雷达网段。
-4. 本次在确认ARP目标、路由和SSH经Wi-Fi后，已执行 `sudo ip addr add 192.168.1.2/24 dev eth0`。保留原有`192.168.10.3/24`、`10.21.20.2/24`和Wi-Fi默认路由。重启后临时地址可能消失，复测前重新检查，不能盲目重复add。撤销本次临时地址的精确命令为 `sudo ip addr del 192.168.1.2/24 dev eth0`，不要删除其它地址；当前未撤销以便继续硬件诊断。恢复机器人本体接线前先规划单独USB网卡。
-5. 原生 SDK 在独立目录固定官方 tag/commit，先检查示例是否修改工作模式或设备配置，再决定运行方式。不得直接运行会改永久配置的示例。
-6. 原生 SDK 点云/IMU连续运行至少60秒，记录帧数、序号缺口、频率、XYZ/Intensity范围、非有限值、原始时间戳与 monotonic 时间。缺失指标标记 unavailable，不能填0伪装通过。
-7. 10秒单调时间窗口对照 LiDAR 与 IMU 原始时间戳增量，异常不偷偷修正。
-8. 上述通过后再判断实际 ROS2 安装及版本，建立独立 `~/unitree_l2_ws`；未通过之前不安装 ROS2、Point-LIO 或 Nav2。
-
-## 坐标和后续结构
-
-[官方坐标定义](https://github.com/unitreerobotics/unilidar_sdk2#2-coordinate-system-definition)：点云原点为底部安装面中心，+X 背离底部出线方向，+Z 垂直底面向上，+Y 按右手系确定。IMU 与点云轴平行，但原点有偏移，未来 wrapper 必须处理这一差异，不能把不同原点的数据仅改 frame 名当成变换。
-
-`base_link → lidar_link` 安装外参尚未测量。配置使用 null/TODO，`publish_tf: false`，不发布虚假的零外参。
-未来 package 划分：`unitree_l2_driver`（C++ SDK→ROS2）、`unitree_l2_bringup`（参数/launch）、`unitree_l2_description`（经测量的TF）、`unitree_l2_processing`（滤波/高度切片/障碍物）。这些 ROS2 package 当前尚未创建。
-
-数据管线保留一个3D源：`/lidar/points → 点云滤波/地面处理/高度切片 → pointcloud_to_laserscan → /scan`；3D SLAM并行消费原始点云和`/lidar/imu`。不依赖L2原生2D模式，不默认启动RViz、不保存所有点云。
-
-原生验证后才能执行 ROS2 验收：`ros2 topic list`、`ros2 topic hz /lidar/points`、`ros2 topic hz /lidar/imu`、`ros2 topic echo /lidar/imu --once`；对照 publisher/subscriber QoS，再用开发电脑 RViz 检查 `Fixed Frame=lidar_link`。
-
-## 已完成的原生编译与复现
-
-第二阶段常规运行请使用安全版本，原`l2_monitor`保留作已知崩溃复现：
+由操作者在 Pi 的项目目录执行：
 
 ```bash
-cd ~/l2_integration
-bash scripts/build_l2_phase2.sh
-./l2_monitor_safe 192.168.1.62 192.168.1.2 65 reports/safe-retest
-# SIGINT/SIGTERM均保存CSV和JSON；不足60秒标INCOMPLETE并返回10，不冒充PASS。
-# 必须等上一个接收程序完全退出后再启动被动探针：
-python3 scripts/l2_wire_analyzer.py --live 65 --output reports/wire-retest
-python3 scripts/l2_wire_analyzer.py --pcap reports/phase2/mode0-raw10.pcap --output reports/offline-retest
-python3 scripts/l2_sequence_analyzer.py reports/wire-retest-frames.csv reports/sequence-retest.json
-bash scripts/test_l2_safe_shutdown.sh
+bash scripts/l2_serial_discover.sh
 ```
 
-`l2_monitor_safe`把官方reader放在子进程内，自己无统计线程；信号只置标志，主循环结束后flush/close自己的文件，再用`_Exit`避开SDK析构。父进程等待、转发信号并记录真实退出码；超时会终止子进程并保留FAIL。返回0只代表点云runtime达到本阶段要求和受控结束，绝不意味着原始设备时钟已修复。
-`*-summary.json`与`*-supervisor.json`分别记录runtime与cleanup。原生closeUDP仍为KNOWN_BUG，不应在正式退出路径调用；ASAN只覆盖本项目代码，不能证明预编译库内部安全。
+不需要 sudo。工具只列出 `lsusb`、`lsusb -t`、ttyACM/ttyUSB 候选、
+`udevadm info` 的属性和父设备属性、`/sys/class/tty/.../device` 解析路径，
+以及已有的 `/dev/unitree_l2`、`/dev/serial/by-id`、`/dev/serial/by-path`。
+它不打开串口、不读数据流、不改波特率/DTR/RTS、不加载 SDK、不选定设备，
+不改 IP/网络/工作模式，不安装软件、不创建/重载 udev 规则，不写输出文件。
+缺工具或查询失败会明确报告并继续收集其它信息。
 
-配置已从实测5改到0，执行前获用户明确授权，且只写入一次、重启一次，随后读回0并持续收到IMU。常规诊断不写模式、不校时；`l2_mode_once`、`l2_sync_once`是受控实验工具，不是bringup步骤，不应重复运行。
+| 返回码 | 仅表示发现工具状态 |
+|---|---|
+| 0 | 元数据查询完成且存在候选；**不代表 L2 已识别或验收通过** |
+| 2 | 非 Linux 或多余参数，未执行 USB 检查 |
+| 3 | 查询完成但没有 ttyACM/ttyUSB 候选 |
+| 4 | 工具、目录缺失或查询失败，清单不完整（优先于 3） |
 
-UDP探针现按header声明的frame长度拆分一个UDP数据报中的多个帧，再校验payload CRC。IMU真实结构80字节，点云1044字节；旧注释156字节不准确。`l2_udp_probe.py`现委托修正后的解析器。序号以真实CSV重新分析，1023→0是观察到的1024周期循环；缺口继续UNKNOWN，不折算成packet loss。
+测试夹具可设置 `L2_DISCOVERY_DEV_ROOT`、`L2_DISCOVERY_SYS_TTY_ROOT`；
+任何非默认目录都输出 OVERRIDDEN，不能作为 Pi 实机证据。正式采集使用默认目录。
+Windows 测试只模拟元数据，不模拟点云或 IMU，不证明真实 USB 枚举。
 
-以下为第一阶段历史复现命令与发现，不作为当前默认启动方式：
+操作者需结合实际适配器接线、设备父路径和经安全安排的插拔对应关系确认身份；
+多个候选时不能选择“第一个”。设备访问组/权限也必须实查，工具不自动修改。
+原始输出可能包含 USB 序列号和拓扑，应保存在本地，不直接提交公开仓库。
 
-官方源：[v2.0.10](https://github.com/unitreerobotics/unilidar_sdk2/releases/tag/v2.0.10)，commit `0e3c51f512e6b8ff60b8c32f160b412cb48445c2`，无活动branch（tag archive）。包SHA256 `8313a85e4bc1a47b73f98cccb9c887c41d897d6a71e800e9b5b03cd4f0fc8131`，与用户已有同名zip一致。库运行时报告2.0.9，记录此上游差异。
-`L2_SDK`目录是Point-LIO/ROS1工程，本次未修改或编译。
+## 持久命名
 
-```bash
-cd ~/l2_integration
-bash scripts/build_l2_monitor.sh
-timeout 75 ./l2_monitor 192.168.1.62 192.168.1.2 65 reports/retest > reports/retest.log 2>&1
-echo "$?" > reports/retest-exit.txt
-python3 scripts/check_l2_acceptance.py reports/retest-summary.json reports/retest-exit.txt
-# 上一程序结束且6201端口释放之后，单独验证原始UDP，绝不与SDK同时绑定：
-python3 scripts/l2_udp_probe.py 192.168.1.2 192.168.1.62 12 reports/passive-retest
-```
+VID、PID、Serial Number、USB topology 均 UNKNOWN。仅提供
+[udev 示例](../udev/99-unitree-l2.rules.example)：
+**TEMPLATE ONLY / NOT READY TO INSTALL**，所有行都被注释，无可生效规则。
+未来用真实、同一 USB 父设备上的属性替换占位符，并验证匹配唯一性。
+序列号不存在或不唯一时需基于实际拓扑设计规则，不能猜 VID/PID。
+验证重插后稳定指向正确设备才可记录 `device_verified: true`。
 
-监测程序调用官方库initializeUDP（18圈/帧，use_system_timestamp=false），只发送版本/配置读取请求，不发送设置模式、启动/停止、重启、地址修改或显式校时指令。SDK内部行为不等同于纯被动接收，所以另用不发送任何报文的UDP探针独立复核时间。
-每帧CSV保留点数/范围/原始时间戳/monotonic；每10秒打印时间增量；仅保存第20帧真实XYZ快照供复查。没有持续保存全部点云。
-`sequence_gaps`是按连续uint32序号假设统计的缺口，`sequence_resets`独立记录回退；在序号语义/设备回退未查清前，**不能直接命名为真实丢帧数**。SDK packet_errors为null，不是假零。
+## Serial 分层验收顺序
 
-已复现`closeUDP()`导致退出139。程序先flush实测报告再关闭，使失败也有证据；这不意味着崩溃已修复。验收还必须检查程序退出码，不能只看JSON。第一轮关闭前未flush造成空summary，该次失败日志被保留；第二轮单独记录，不覆盖原始失败。
-CRC诊断按实测payload区间`[12:-12]`计算，原先按header+payload计算会全报不匹配，已修正并重新实测；不能把旧算法结果当成链路损坏证据。
+1. USB enumeration：实际 Pi 输出与物理接线对应，记录操作系统、USB 拓扑与适配器身份。
+2. Serial identification：确认真实设备节点、权限及持久名称；节点存在不代表 mode=8。
+3. Official SDK serial runtime：检查 `config/sdk.lock.json` 固定版本的头文件、实现可见部分和
+   Serial 示例；确认真实函数签名、波特率、初始化/退出及隐藏副作用后，才编写最小受控监测程序。
+   不复用 UDP 初始化，不照搬带模式写入的示例。库内部不可见行为明确标 UNKNOWN。
+4. Point cloud：验证持续非空帧、有限 XYZ/Intensity、范围、点数、帧率、接收间隔及序号变化。
+   未知序号语义不能折算成真实丢包；缺失指标记 unavailable，不填假零。
+5. IMU：持续收到有限的加速度、角速度、姿态及原始时间戳；点云通过不代表 IMU 通过。
+6. Timestamp：分别记录 LiDAR/IMU 原始秒/纳秒、主机 monotonic 接收时间，做至少一个 10 秒
+   窗口，再做 ≥60 秒稳定测试中的连续窗口。每个流计算
+   `device_delta_seconds / monotonic_elapsed_seconds`，记录范围、漂移、回退和中断。
+   验收前明确误差阈值；历史检查器的 0.98–1.02 仅作为待目标验证的候选范围，不能据此假 PASS。
+   不乘 2 修正，不以系统时间戳替代原始时间掩盖比例异常，不自动校时。
+7. Clean shutdown：正常结束、SIGINT、SIGTERM 均保留结果及真实退出码，检查串口释放，
+   再次启动是否成功；不足时长标 INCOMPLETE。Serial 退出不能沿用 UDP wrapper 的 PASS。
+8. USB reconnect：由操作者安全安排断连/重连，验证断流检测、退出/资源回收、正确适配器重新识别；
+   不自动修改模式，不恢复任何机器狗运动。持续运行与重连需要独立证据。
+9. 上述关键项全部通过并经评审，才进入 ROS2 Driver，随后 Point-LIO 与 Nav2。
 
-相似现象的上游问题：[设备时间半速 #25](https://github.com/unitreerobotics/unilidar_sdk2/issues/25)、[ARM64 closeUDP崩溃 #18](https://github.com/unitreerobotics/unilidar_sdk2/issues/18)。它们是旁证，不能代替本机证据；未擅自刷固件或修改时间比例。
+| Serial 验收项 | 本阶段状态 |
+|---|---|
+| SERIAL ENUMERATION | NOT RUN |
+| SERIAL SDK RUNTIME | NOT RUN |
+| POINT CLOUD | NOT RUN |
+| IMU | NOT RUN |
+| TIMESTAMP（10 秒窗口） | NOT RUN |
+| STABILITY（≥60 秒） | NOT RUN |
+| SERIAL CLEAN SHUTDOWN | NOT RUN |
+| USB RECONNECT | NOT RUN |
+| READY FOR ROS2 | NO |
+
+本阶段没有新增 native Serial monitor，没有在 Windows 编译官方 aarch64 库，
+也没有运行官方 Serial 程序：**NOT RUN ON TARGET**。
+
+## Previous verified Ethernet bench setup — historical evidence
+
+[L2_PHASE2_REPORT.md](L2_PHASE2_REPORT.md) 原文保留，不修改历史事实。
+当时 Raspberry Pi 5B / Ubuntu 24.04.4 / aarch64 经 Ethernet/UDP 实测，
+临时雷达/主机端点及端口保存在 `historical_ethernet`，不是当前部署默认值。
+
+- 授权的一次性设置使模式从 5 改为 0，随后读回 0，IMU 恢复。
+- 点云与 IMU 有实测数据，但两者时钟增速约为真实时间的 0.5 倍；一次授权校时未修复比例。
+- 官方 ARM64 `closeUDP()` 析构有已知崩溃；历史 `l2_monitor_safe` 用进程隔离避开析构，
+  这不是 vendor 缺陷修复，更不是 Serial cleanup 的验收结果。
+- SDK provenance 为 v2.0.10 / `0e3c51f512e6b8ff60b8c32f160b412cb48445c2`；
+  运行库曾自报 2.0.9，上游差异保留。
+
+Ethernet 半速问题在 Serial 上是否仍存在是 UNKNOWN，必须重新测量。
+历史 `l2_diagnostics.sh`、`l2_network_test.sh`、UDP probes/analyzers、
+`build_l2_monitor.sh`、`build_l2_phase2.sh`、`test_l2_safe_shutdown.sh` 和 `native/l2_*`
+保留作追溯，**不是 Serial bringup**。`l2_mode_once` / `l2_sync_once` 不得纳入自动启动。
+旧 Ethernet 验收器的序号假设也不能不加审查地用于 Serial。
+过去临时网卡/IP 状态不是当前事实；本阶段不撤销或重新配置任何真实网络。
+
+## 后续数据与坐标边界
+
+未来 `SDK Serial → PointCloud + IMU → 时间验收 → ROS2 → Point-LIO → Nav2`。
+主题目标 `/lidar/points`、`/lidar/imu` 尚未发布；ROS2 packages 尚未创建。
+`base_link → lidar_link` 外参未测量，配置保持 null、`publish_tf: false`。
+点云与 IMU 坐标轴平行但原点不同，未来驱动应遵循
+[官方坐标定义](https://github.com/unitreerobotics/unilidar_sdk2/blob/0e3c51f512e6b8ff60b8c32f160b412cb48445c2/README.md#2-coordinate-system-definition)，不能只改 frame 名冒充坐标变换。
+未来保留 3D 源供 LIO，并经滤波/地面处理/高度切片形成导航障碍物输入；
+不依赖 L2 原生 2D 模式，不默认开启 RViz 或持续保存全部点云。

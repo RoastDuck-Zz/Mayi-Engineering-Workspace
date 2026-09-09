@@ -1,0 +1,11 @@
+# TEMPLATE ONLY -- NOT READY TO INSTALL
+# All lines are comments. No VID/PID, serial number or USB topology is verified.
+# Run scripts/l2_serial_discover.sh on the Pi and identify the actual adapter.
+# A human must replace placeholders with observed attributes from the same USB
+# parent and validate uniqueness, reconnect behaviour and permissions on target.
+# VID/PID alone may match multiple adapters; never pick the first tty device.
+# If serial is absent/nonunique, design a topology match from actual evidence.
+# Do not activate this template or reload/trigger udev as part of discovery.
+# Desired persistent name: /dev/unitree_l2
+# Example shape ONLY (deliberately commented and non-installable):
+# SUBSYSTEM=="tty", ATTRS{idVendor}=="<OBSERVED_VID>", ATTRS{idProduct}=="<OBSERVED_PID>", ATTRS{serial}=="<OBSERVED_UNIQUE_SERIAL>", SYMLINK+="unitree_l2"

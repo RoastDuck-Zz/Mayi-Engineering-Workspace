@@ -1,10 +1,16 @@
 # GuideRobotDog · Mymooo 控制端
 
-Unitree L2 独立接入诊断见 [L2 README](docs/L2_README.md)、[最新协议/IMU/退出诊断报告](docs/L2_PHASE2_REPORT.md) 和 [第一阶段历史报告](docs/L2_DEVELOPMENT_REPORT.md)。IMU已恢复，半速设备时钟仍待解决；尚未进入ROS2。诊断脚本不修改机器人网络。
+当前阶段：**Phase A — Architecture Baseline + L2 Serial Migration**。
+Web 与 F710 已有；L2 正迁移到 **TTL UART → Unitree UART→USB Adapter → Pi USB**。
+Serial 实机枚举、SDK、点云、IMU、时间戳、退出及重连均为 **NOT RUN**，尚未进入 ROS2。
+见 [Serial 接入与验收](docs/L2_README.md)、[最终架构基线](docs/FINAL_ARCHITECTURE.md)
+和 [Phase A 审查记录](docs/PHASE_A_REPORT.md)。
+此前 IMU 恢复与约半速时钟是 [Ethernet 历史实测](docs/L2_PHASE2_REPORT.md)，
+不代表 Serial 结果；历史报告保留。
 
 这是运行在 Raspberry Pi 5B 上的纯 Mymooo 机器狗控制项目。浏览器通过 HTTP/JSON 访问 `server.py`，所有运动命令统一经过 `ControlService` 的控制权、安全锁定和命令时限检查，再交给 `MockRobotAdapter` 或 `MymoooRobotAdapter`。
 
-## 最终网络与控制拓扑
+## 现有网络与控制拓扑
 
 ```text
                     MaYi-FC
@@ -31,6 +37,8 @@ Unitree L2 独立接入诊断见 [L2 README](docs/L2_README.md)、[最新协议/
 - `wlan0` 是 Management Plane，由路由器 DHCP 管理，承载 SSH、Web、Internet 和系统维护。
 - `eth0` 是 Robot Control Plane，只连接 Mymooo 专网，不配置 gateway、DNS 或默认路由。
 - Web 继续绑定 `0.0.0.0:8088`，不绑定可能变化的 DHCP 地址。
+- L2 最终使用 USB 串口，不规划第二张雷达网卡。`/dev/unitree_l2` 是未验证的持久命名目标。
+- F710 接收器使用 USB；相机及独立动力断电安全控制器留待后续阶段。
 
 ## 运行边界
 
@@ -42,6 +50,12 @@ Unitree L2 独立接入诊断见 [L2 README](docs/L2_README.md)、[最新协议/
 - Python：项目内 `.venv/bin/python`
 
 ## 安全语义
+
+以下是现有控制保护。最终设计将 OperatingMode 与 SafetyState 分离，并区分
+SOFT_ESTOP（停运动、请求阻尼并锁定，计算系统继续运行）和 HARD_ESTOP（硬件切断动力）。
+当前 F710 B 对应软件急停；真实硬断电尚未实现，不能用零速度冒充。
+未来默认 UnavailablePowerCutBackend 必须返回 `hardware_power_cut_unavailable`。
+完整状态机、独立 RESET/ARM 流程及 Web/F710 硬急停操作均未在 Phase A 实现。
 
 - 服务启动、断开和关闭时处于安全锁定状态。
 - 非零速度命令必须在 300 ms 内刷新，否则发送零速度并锁定为 `motion_command_timeout`。
@@ -98,23 +112,24 @@ ControlService。安装、输入检查与按键说明见 [F710 使用说明](doc
 ## 未来输入边界
 
 ```text
-Web Input ───────────┐
-Future Gamepad Input ├─> Future Control Arbiter -> Safety
-Future Autonomous ──┘                            │
-                                                ▼
-                                      MymoooRobotAdapter
-                                                │
-                                             bpx_sdk
+Web / F710 → Future Mode Manager → Manual / Follow / Navigation
+                                           │
+                            Future Control Arbiter → Safety Supervisor
+                                                           │
+                                                Robot Driver → bpx_sdk
 ```
 
-F710 已通过现有控制权租约接入；自主巡航、避障、跟随或完整 Control Arbiter 尚未实现。
+F710 已通过现有控制权租约接入。目标模式为 STANDBY、MANUAL_GAMEPAD、MANUAL_WEB、
+FOLLOW、NAVIGATION、PATROL、RETURN_HOME；避障是自主模式共用能力。
+完整 Mode Manager / Control Arbiter / SafetyState 与自主功能均留待后续，
+Phase A 提交后等待 ChatGPT 审查，不自动进入下一阶段。
 
 ## 测试
 
 ```bash
 .venv/bin/python -m unittest discover -s tests -v
 node --test tests/test_*.cjs
-bash -n scripts/*.sh
+for script in scripts/*.sh; do bash -n "$script" || exit; done
 ```
 
 采购清单不被程序读取。旧迁移资料位于 `docs/history/`，只用于追溯，不代表当前系统组成。
